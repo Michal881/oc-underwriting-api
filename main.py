@@ -197,19 +197,6 @@ def predict_product(data):
     }
 
 
-def _disabled_llm_estimation(reason: str) -> LLMEstimation:
-    return LLMEstimation(
-        status="disabled",
-        estimated_premium=None,
-        premium_range_low=None,
-        premium_range_high=None,
-        confidence="low",
-        reason=reason,
-        missing_data=[],
-        hitl_required=True,
-    )
-
-
 def _error_llm_estimation(reason: str) -> LLMEstimation:
     return LLMEstimation(
         status="error",
@@ -244,41 +231,78 @@ def _fallback_llm_estimation(reason: str, premium_estimation: dict) -> LLMEstima
     )
 
 
+def _extract_first_json_object(text: str) -> Optional[dict]:
+    candidate = (text or "").strip()
+    if not candidate:
+        return None
+
+    try:
+        obj = json.loads(candidate)
+        if isinstance(obj, dict):
+            return obj
+    except json.JSONDecodeError:
+        pass
+
+    decoder = JSONDecoder()
+    for index, char in enumerate(candidate):
+        if char != "{":
+            continue
+        try:
+            obj, _ = decoder.raw_decode(candidate[index:])
+            if isinstance(obj, dict):
+                return obj
+        except json.JSONDecodeError:
+            continue
+
+    return None
+
+
+def _is_effectively_empty_policy(policy_data: dict) -> bool:
+    fields_to_check = [
+        "product_family",
+        "insured_activity",
+        "scope_of_insurance",
+        "insured_products",
+        "sum_guaranteed_amount",
+        "turnover_amount",
+        "rate_primary_per_mille",
+        "premium_amount",
+        "deductible_amount",
+    ]
+    for key in fields_to_check:
+        value = policy_data.get(key)
+        if isinstance(value, str) and value.strip():
+            return False
+        if value not in (None, ""):
+            return False
+    return True
+
+
+def _heuristic_estimate(policy_data: dict, premium_estimation: dict) -> Optional[float]:
+    ml_or_rules = premium_estimation.get("estimated")
+    if isinstance(ml_or_rules, (int, float)):
+        return float(ml_or_rules)
+    if isinstance(policy_data.get("premium_amount"), (int, float)):
+        return float(policy_data["premium_amount"])
+    if isinstance(policy_data.get("turnover_amount"), (int, float)) and isinstance(
+        policy_data.get("rate_primary_per_mille"), (int, float)
+    ):
+        return float(policy_data["turnover_amount"]) * float(policy_data["rate_primary_per_mille"]) / 1000
+    if isinstance(policy_data.get("sum_guaranteed_amount"), (int, float)):
+        return float(policy_data["sum_guaranteed_amount"]) * 0.003
+    return None
+
+
 def generate_llm_estimation(policy_data, product_prediction, premium_estimation) -> LLMEstimation:
     api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        return _disabled_llm_estimation("OPENAI_API_KEY not configured")
-
     model_name = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
     logger.info(
-        "Starting LLM estimation. model=%s openai_api_key_present=%s",
-        model_name,
+        "Starting LLM estimation. openai_api_key_present=%s model=%s",
         bool(api_key),
+        model_name,
     )
-    schema = {
-        "type": "object",
-        "additionalProperties": False,
-        "properties": {
-            "status": {"type": "string", "enum": ["ok", "fallback"]},
-            "estimated_premium": {"type": ["number", "null"]},
-            "premium_range_low": {"type": ["number", "null"]},
-            "premium_range_high": {"type": ["number", "null"]},
-            "confidence": {"type": "string", "enum": ["low", "medium", "high"]},
-            "reason": {"type": "string"},
-            "missing_data": {"type": "array", "items": {"type": "string"}},
-            "hitl_required": {"type": "boolean"},
-        },
-        "required": [
-            "status",
-            "estimated_premium",
-            "premium_range_low",
-            "premium_range_high",
-            "confidence",
-            "reason",
-            "missing_data",
-            "hitl_required",
-        ],
-    }
+    if not api_key:
+        return _fallback_llm_estimation("OPENAI_API_KEY not configured", premium_estimation)
 
     prompt = {
         "policy": {
@@ -295,10 +319,21 @@ def generate_llm_estimation(policy_data, product_prediction, premium_estimation)
         "product_prediction": product_prediction,
         "premium_estimation": premium_estimation,
         "instructions": (
-            "Provide indicative, non-binding premium estimate for human-in-the-loop underwriting review. "
-            "The estimate is allowed even when premium_estimation.estimated is null. "
-            "Return only valid JSON matching the schema. Set hitl_required=true. "
-            "Reason must explicitly say estimate is indicative only and requires underwriter review."
+            "Return ONLY valid JSON (no markdown, no explanations) and no text outside JSON. "
+            "JSON object must be exactly: "
+            "{"
+            '"status":"ok",'
+            '"estimated_premium":number,'
+            '"premium_range_low":number,'
+            '"premium_range_high":number,'
+            '"confidence":"low|medium|high",'
+            '"reason":"string",'
+            '"missing_data":["string"],'
+            '"hitl_required":true'
+            "}. "
+            "Provide a speculative, non-binding HITL estimate. "
+            "If data is incomplete, still provide a rough estimate unless the policy input is completely empty. "
+            "Reason must explicitly say this estimate is indicative only and requires underwriter review."
         ),
     }
 
@@ -310,14 +345,6 @@ def generate_llm_estimation(policy_data, product_prediction, premium_estimation)
                 "content": [{"type": "input_text", "text": json.dumps(prompt, ensure_ascii=False)}],
             }
         ],
-        "text": {
-            "format": {
-                "type": "json_schema",
-                "name": "llm_estimation",
-                "schema": schema,
-                "strict": True,
-            }
-        },
     }
 
     req = request.Request(
@@ -333,86 +360,58 @@ def generate_llm_estimation(policy_data, product_prediction, premium_estimation)
     try:
         with request.urlopen(req, timeout=20) as response:
             parsed = json.loads(response.read().decode("utf-8"))
-
-            def _extract_output_parsed(payload: dict) -> Optional[dict]:
-                direct = payload.get("output_parsed")
-                if isinstance(direct, dict):
-                    return direct
-
-                for item in payload.get("output", []):
-                    if not isinstance(item, dict):
-                        continue
-                    for content_item in item.get("content", []):
-                        if isinstance(content_item, dict) and isinstance(content_item.get("parsed"), dict):
-                            return content_item["parsed"]
-                return None
-
-            def _extract_json_from_text(text: str) -> Optional[dict]:
-                candidate = text.strip()
-                if not candidate:
-                    return None
-
-                try:
-                    obj = json.loads(candidate)
-                    if isinstance(obj, dict):
-                        return obj
-                except json.JSONDecodeError:
-                    pass
-
-                decoder = JSONDecoder()
-                for index, char in enumerate(candidate):
-                    if char != "{":
-                        continue
-                    try:
-                        obj, _ = decoder.raw_decode(candidate[index:])
-                        if isinstance(obj, dict):
-                            return obj
-                    except json.JSONDecodeError:
-                        continue
-                return None
-
-            llm_data = _extract_output_parsed(parsed)
-            parsing_path = "output_parsed"
-
-            output_text = parsed.get("output_text")
-            output_text_empty = not bool(isinstance(output_text, str) and output_text.strip())
-            logger.info("LLM response diagnostics: model=%s output_text_empty=%s", model_name, output_text_empty)
-
-            if llm_data is None and isinstance(output_text, str):
-                llm_data = _extract_json_from_text(output_text)
-                parsing_path = "output_text/json_extraction"
-
+            output_text = parsed.get("output_text") if isinstance(parsed, dict) else None
+            logger.info(
+                "LLM response diagnostics: model=%s output_text_length=%s",
+                model_name,
+                len(output_text) if isinstance(output_text, str) else 0,
+            )
+            llm_data = _extract_first_json_object(output_text or "")
             if llm_data is None:
                 return _fallback_llm_estimation(
-                    "OpenAI response could not be parsed into structured JSON; indicative fallback prepared for HITL only.",
+                    "OpenAI JSON parse failed after extraction attempts; indicative fallback prepared for HITL only.",
                     premium_estimation,
                 )
 
-            llm_data["hitl_required"] = True
-            if llm_data.get("status") == "enabled":
-                llm_data["status"] = "ok"
-            if llm_data.get("status") not in ["ok", "fallback"]:
-                llm_data["status"] = "ok"
-            reason = str(llm_data.get("reason") or "").strip()
-            if not reason:
-                reason = "Indicative only, non-binding; requires underwriter review."
-            elif "underwriter review" not in reason.lower():
-                reason = f"{reason} Indicative only, non-binding; requires underwriter review."
-            llm_data["reason"] = reason
-            logger.info("LLM response parsed successfully via=%s", parsing_path)
-            return LLMEstimation.model_validate(llm_data)
+            est = llm_data.get("estimated_premium")
+            if not isinstance(est, (int, float)):
+                if _is_effectively_empty_policy(policy_data):
+                    est = 0.0
+                else:
+                    est = _heuristic_estimate(policy_data, premium_estimation)
+            if isinstance(est, (int, float)):
+                est = round(float(est), 2)
+            low = llm_data.get("premium_range_low")
+            high = llm_data.get("premium_range_high")
+            if not isinstance(low, (int, float)) and isinstance(est, (int, float)):
+                low = round(est * 0.8, 2)
+            if not isinstance(high, (int, float)) and isinstance(est, (int, float)):
+                high = round(est * 1.2, 2)
+
+            reason = str(llm_data.get("reason") or "").strip() or "Indicative only, non-binding estimate."
+            if "underwriter review" not in reason.lower():
+                reason = f"{reason} Requires underwriter review."
+
+            normalized = {
+                "status": "ok",
+                "estimated_premium": est if isinstance(est, (int, float)) else None,
+                "premium_range_low": round(float(low), 2) if isinstance(low, (int, float)) else None,
+                "premium_range_high": round(float(high), 2) if isinstance(high, (int, float)) else None,
+                "confidence": llm_data.get("confidence") if llm_data.get("confidence") in {"low", "medium", "high"} else "low",
+                "reason": reason,
+                "missing_data": llm_data.get("missing_data") if isinstance(llm_data.get("missing_data"), list) else [],
+                "hitl_required": True,
+            }
+            return LLMEstimation.model_validate(normalized)
     except (json.JSONDecodeError, ValueError):
         return _fallback_llm_estimation(
             "Invalid OpenAI JSON payload; indicative fallback prepared for HITL only.",
             premium_estimation,
         )
-    except error.HTTPError:
-        return _error_llm_estimation(
-            "LLM service unavailable; unable to produce indicative estimate right now."
-        )
-    except error.URLError:
-        return _error_llm_estimation(
-            "Network error while contacting LLM service; try again later."
+    except (error.HTTPError, error.URLError, Exception):
+        return _fallback_llm_estimation(
+            "OpenAI exception occurred; indicative fallback prepared for HITL only.",
+            premium_estimation,
         )
 
 
