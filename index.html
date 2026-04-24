@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pl">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>OC Underwriting MVP UI</title>
+  <title>Demo ankiety OC underwriting</title>
   <style>
     :root {
       --bg: #f3f6fb;
@@ -288,12 +288,12 @@
 <body>
   <main class="container">
     <section class="panel">
-      <h1>OC Underwriting MVP</h1>
-      <p class="subtle">Static demo UI for a human-in-the-loop underwriting assistant using synthetic scenarios only.</p>
-      <div class="banner warning">This tool provides indicative support only. It must not be treated as a final underwriting decision.</div>
+      <h1>Demo OC underwriting (HITL)</h1>
+      <p class="subtle">Statyczny formularz demonstracyjny asystenta underwritingowego z użyciem wyłącznie danych syntetycznych.</p>
+      <div class="banner warning">To narzędzie ma charakter orientacyjny. Nie stanowi ostatecznej decyzji underwritingowej.</div>
 
       <div class="field">
-        <label for="scenario">Scenario template</label>
+        <label for="scenario">Szablon scenariusza</label>
         <select id="scenario"></select>
       </div>
 
@@ -301,7 +301,7 @@
         <div class="field" data-field="product_family">
           <label for="product_family">product_family</label>
           <select id="product_family">
-            <option value="">(empty / auto-detect)</option>
+            <option value="">(puste / auto-wykrywanie)</option>
             <option value="oc_ogolne">oc_ogolne</option>
             <option value="oc_zawodowe">oc_zawodowe</option>
             <option value="oc_produkt_lub_mieszane">oc_produkt_lub_mieszane</option>
@@ -346,18 +346,35 @@
         </div>
         <div class="field" data-field="territorial_scope">
           <label for="territorial_scope">Zakres terytorialny</label>
-          <input id="territorial_scope" type="text" placeholder="e.g. Poland + EU, synthetic distribution only" />
+          <input id="territorial_scope" type="text" placeholder="np. Polska + UE, wyłącznie dane syntetyczne" />
         </div>
       </div>
 
       <div class="field" data-field="claims_history">
         <label for="claims_history">Historia szkód</label>
-        <textarea id="claims_history" placeholder="Synthetic summary of prior claims, if any."></textarea>
+        <textarea id="claims_history" placeholder="Syntetyczne podsumowanie dotychczasowych szkód (jeśli wystąpiły)."></textarea>
       </div>
 
       <div class="field" data-field="detailed_risk_factors">
         <label for="detailed_risk_factors">Czynniki ryzyka</label>
-        <textarea id="detailed_risk_factors" placeholder="Synthetic risk profile, controls, processes, incident prevention."></textarea>
+        <textarea id="detailed_risk_factors" placeholder="Syntetyczny profil ryzyka: procedury, zabezpieczenia, kontrole, prewencja szkód."></textarea>
+      </div>
+
+      <div class="field">
+        <label>Pomocnicze czynniki ryzyka</label>
+        <div class="checkbox-grid">
+          <label class="checkbox-item"><input class="risk-helper" data-label="podwykonawcy" type="checkbox" /> podwykonawcy</label>
+          <label class="checkbox-item"><input class="risk-helper" data-label="prace na wysokości" type="checkbox" /> prace na wysokości</label>
+          <label class="checkbox-item"><input class="risk-helper" data-label="roboty gorące" type="checkbox" /> roboty gorące</label>
+          <label class="checkbox-item"><input class="risk-helper" data-label="szkody w dokumentach" type="checkbox" /> szkody w dokumentach</label>
+          <label class="checkbox-item"><input class="risk-helper" data-label="czyste straty finansowe" type="checkbox" /> czyste straty finansowe</label>
+          <label class="checkbox-item"><input class="risk-helper" data-label="eksport produktu" type="checkbox" /> eksport produktu</label>
+          <label class="checkbox-item"><input class="risk-helper" data-label="USA/Kanada" type="checkbox" /> USA/Kanada</label>
+          <label class="checkbox-item"><input class="risk-helper" data-label="dane finansowe klientów" type="checkbox" /> dane finansowe klientów</label>
+          <label class="checkbox-item"><input class="risk-helper" data-label="żywność / alergeny" type="checkbox" /> żywność / alergeny</label>
+          <label class="checkbox-item"><input class="risk-helper" data-label="odpowiedzialność projektowa" type="checkbox" /> odpowiedzialność projektowa</label>
+        </div>
+        <p class="inline-note">Zaznaczenie opcji automatycznie uzupełnia opis ryzyk w polu <code>detailed_risk_factors</code>.</p>
       </div>
 
       <div class="grid">
@@ -375,7 +392,7 @@
       </div>
 
       <div class="field">
-        <label>Cover flags</label>
+        <label>Flagi zakresu ochrony</label>
         <div class="checkbox-grid">
           <label class="checkbox-item"><input id="covers_general_liability" type="checkbox" /> covers_general_liability</label>
           <label class="checkbox-item"><input id="covers_professional_liability" type="checkbox" /> covers_professional_liability</label>
@@ -386,46 +403,46 @@
           <label class="checkbox-item"><input id="covers_documents_loss" type="checkbox" /> covers_documents_loss</label>
           <label class="checkbox-item"><input id="covers_subcontractors" type="checkbox" /> covers_subcontractors</label>
         </div>
-        <p class="inline-note">All values are editable after loading a scenario.</p>
+        <p class="inline-note">Wszystkie wartości pozostają edytowalne po załadowaniu scenariusza.</p>
       </div>
 
       <div class="actions">
-        <button id="submitBtn" class="primary" type="button">Run /underwrite</button>
+        <button id="submitBtn" class="primary" type="button">Uruchom /underwrite</button>
         <button id="fillMissingBtn" class="secondary" type="button">Uzupełnij przykładowymi danymi</button>
-        <button id="reloadScenarioBtn" class="secondary" type="button">Reload selected scenario</button>
+        <button id="reloadScenarioBtn" class="secondary" type="button">Wczytaj ponownie wybrany scenariusz</button>
       </div>
-      <p id="loading" class="loading" hidden>Submitting request and waiting for response...</p>
+      <p id="loading" class="loading" hidden>Wysyłanie zapytania i oczekiwanie na odpowiedź...</p>
       <div id="errorBox" class="banner danger" hidden></div>
     </section>
 
     <section class="panel">
-      <h2>Results</h2>
-      <div class="banner warning">LLM estimate is indicative only and requires underwriter review.</div>
+      <h2>Wyniki</h2>
+      <div class="banner warning">Estymacja LLM jest orientacyjna i wymaga przeglądu underwritera.</div>
 
       <div class="result-grid">
         <article class="result-card">
-          <h4>Product prediction</h4>
-          <div id="productResult" class="muted">No result yet.</div>
+          <h4>Predykcja produktu</h4>
+          <div id="productResult" class="muted">Brak wyniku.</div>
         </article>
 
         <article class="result-card">
-          <h4>ML/rules premium estimation</h4>
-          <div id="premiumResult" class="muted">No result yet.</div>
+          <h4>Estymacja składki (ML/reguły)</h4>
+          <div id="premiumResult" class="muted">Brak wyniku.</div>
         </article>
 
         <article class="result-card">
-          <h4>LLM indicative estimation</h4>
-          <div id="llmResult" class="muted">No result yet.</div>
+          <h4>Estymacja orientacyjna LLM</h4>
+          <div id="llmResult" class="muted">Brak wyniku.</div>
         </article>
       </div>
 
       <div id="llmExplanationBox" class="explanation-box" hidden>
-        <h3>LLM explanation</h3>
-        <div id="llmExplanationText" class="muted">No explanation yet.</div>
+        <h3>Uzasadnienie LLM</h3>
+        <div id="llmExplanationText" class="muted">Brak uzasadnienia.</div>
       </div>
 
       <details class="raw-json">
-        <summary>Raw JSON response</summary>
+        <summary>Surowa odpowiedź JSON</summary>
         <pre id="jsonResult">{}</pre>
       </details>
     </section>
@@ -436,15 +453,15 @@
 
     const SCENARIOS = {
       restaurant: {
-        label: "restaurant / catering",
+        label: "Restauracja / catering",
         data: {
           product_family: "oc_ogolne",
-          insured_activity: "Operation of a mid-size restaurant and event catering service using synthetic data.",
-          scope_of_insurance: "General liability for daily operations, guest incidents, and catering services.",
-          insured_products: "Prepared meals, packaged takeaway products, non-alcoholic beverages.",
-          detailed_risk_factors: "Synthetic medium footfall, HACCP procedures, quarterly safety drills, documented cleaning checks.",
-          claims_history: "Synthetic: 1 minor slip claim in 3 years, settled below deductible threshold.",
-          territorial_scope: "Poland only; no cross-border services.",
+          insured_activity: "Prowadzenie średniej restauracji oraz obsługa cateringu eventowego; dane demonstracyjne i syntetyczne.",
+          scope_of_insurance: "OC działalności za szkody osobowe i rzeczowe gości, szkody w mieniu osób trzecich oraz OC za produkt spożywczy.",
+          insured_products: "Posiłki przygotowywane na miejscu, catering z dowozem, napoje bezalkoholowe, wyroby paczkowane na wynos.",
+          detailed_risk_factors: "Syntetycznie: kontrola HACCP, ewidencja alergenów, audyty czystości, rotacyjna kontrola temperatur chłodni, szkolenia BHP personelu kuchni i sali.",
+          claims_history: "Syntetycznie: 1 szkoda drobna (poślizgnięcie klienta) w 36 miesiącach, brak szkód ciężkich, brak regresów.",
+          territorial_scope: "Polska; okazjonalne usługi cateringowe na terenie UE bez USA/Kanada.",
           sum_guaranteed_amount: 2000000,
           turnover_amount: 4500000,
           rate_primary_per_mille: 1.4,
@@ -462,15 +479,15 @@
         }
       },
       property_management: {
-        label: "property management",
+        label: "Zarządzanie nieruchomościami",
         data: {
           product_family: "oc_ogolne",
-          insured_activity: "Management of synthetic residential and mixed-use properties.",
-          scope_of_insurance: "General liability tied to property possession, tenant areas, and maintenance coordination.",
-          insured_products: "Property management services only.",
-          detailed_risk_factors: "Synthetic aging infrastructure exposure, monthly building inspections, documented maintenance vendor controls.",
-          claims_history: "Synthetic: no material claims in last 5 years.",
-          territorial_scope: "Poland and selected EU sites.",
+          insured_activity: "Zarządzanie syntetycznym portfelem budynków mieszkalnych i usługowych, koordynacja utrzymania technicznego i administracji najmu.",
+          scope_of_insurance: "OC z tytułu posiadania i zarządzania nieruchomościami, odpowiedzialność za części wspólne i koordynację podwykonawców.",
+          insured_products: "Usługi administracyjne, obsługa wspólnot, nadzór nad serwisami technicznymi.",
+          detailed_risk_factors: "Syntetycznie: starsza infrastruktura, rejestr przeglądów okresowych, umowy SLA z serwisem, procedura zgłaszania awarii 24/7.",
+          claims_history: "Syntetycznie: brak szkód o istotnej wartości w ostatnich 5 latach; pojedyncze zgłoszenia assistance bez wypłaty odszkodowania.",
+          territorial_scope: "Polska + wybrane nieruchomości w UE.",
           sum_guaranteed_amount: 3000000,
           turnover_amount: 6000000,
           rate_primary_per_mille: 1.1,
@@ -488,15 +505,15 @@
         }
       },
       accounting_office: {
-        label: "accounting office",
+        label: "Biuro rachunkowe",
         data: {
           product_family: "oc_zawodowe",
-          insured_activity: "Bookkeeping and payroll advisory provided by a synthetic accounting office.",
-          scope_of_insurance: "Professional liability for accounting errors and advisory omissions.",
-          insured_products: "Accounting, payroll and tax filing support services.",
-          detailed_risk_factors: "Synthetic dual-review workflows, encrypted document exchange, annual compliance training.",
-          claims_history: "Synthetic: one late-filing allegation, no indemnity payment.",
-          territorial_scope: "Poland only.",
+          insured_activity: "Prowadzenie ksiąg rachunkowych, obsługa płac i doradztwo podatkowe dla klientów MŚP; wyłącznie przypadek syntetyczny.",
+          scope_of_insurance: "OC zawodowe za błędy księgowe, opóźnienia deklaracyjne oraz uchybienia proceduralne.",
+          insured_products: "Usługi księgowe, kadrowo-płacowe, rozliczenia podatkowe i raportowanie finansowe.",
+          detailed_risk_factors: "Syntetycznie: zasada czterech oczu, szyfrowanie dokumentów, kontrola uprawnień, backup dzienny, plan ciągłości działania.",
+          claims_history: "Syntetycznie: jedno roszczenie o opóźnienie deklaracji bez potwierdzonej szkody finansowej.",
+          territorial_scope: "Polska.",
           sum_guaranteed_amount: 1500000,
           turnover_amount: 2200000,
           rate_primary_per_mille: 2.0,
@@ -514,15 +531,15 @@
         }
       },
       construction_contractor: {
-        label: "construction contractor",
+        label: "Wykonawca budowlany",
         data: {
           product_family: "oc_ogolne",
-          insured_activity: "Synthetic contractor executing renovation and fit-out works.",
-          scope_of_insurance: "General liability including completed operations and subcontracted works.",
-          insured_products: "Renovation, fit-out, and installation services.",
-          detailed_risk_factors: "Synthetic subcontractor reliance, mandatory safety induction, site-specific risk assessments before each project.",
-          claims_history: "Synthetic: two minor third-party property damage claims in 4 years.",
-          territorial_scope: "Poland + temporary projects in EU.",
+          insured_activity: "Roboty wykończeniowe i modernizacyjne obiektów komercyjnych, częściowo z wykorzystaniem podwykonawców.",
+          scope_of_insurance: "OC działalności i OC po wykonaniu usługi, z włączeniem szkód wyrządzonych przez podwykonawców.",
+          insured_products: "Usługi budowlano-montażowe, instalacje wewnętrzne, prace remontowe.",
+          detailed_risk_factors: "Syntetycznie: prace na wysokości i roboty gorące, plan BIOZ, instruktaż stanowiskowy, protokoły odbioru etapowego, dzienniki kontroli BHP.",
+          claims_history: "Syntetycznie: 2 szkody rzeczowe o niskiej wartości w 48 miesiącach, bez szkód osobowych ciężkich.",
+          territorial_scope: "Polska + czasowe kontrakty na terenie UE.",
           sum_guaranteed_amount: 5000000,
           turnover_amount: 12000000,
           rate_primary_per_mille: 2.4,
@@ -540,15 +557,15 @@
         }
       },
       product_manufacturer: {
-        label: "product liability manufacturer",
+        label: "Producent / OC za produkt",
         data: {
           product_family: "oc_produkt_lub_mieszane",
-          insured_activity: "Synthetic manufacturer of household electrical accessories.",
-          scope_of_insurance: "General and product liability for manufactured and distributed goods.",
-          insured_products: "Adapters, power strips, and low-voltage electronic accessories.",
-          detailed_risk_factors: "Synthetic batch quality controls, supplier audits, periodic product testing with documented traceability.",
-          claims_history: "Synthetic: no bodily injury claims, one product return wave due to packaging defect.",
-          territorial_scope: "EU distribution only.",
+          insured_activity: "Produkcja i dystrybucja syntetycznych akcesoriów elektrycznych niskonapięciowych dla rynku detalicznego.",
+          scope_of_insurance: "OC działalności, OC za produkt oraz szkody po dostawie towaru (completed operations).",
+          insured_products: "Listwy zasilające, adaptery, akcesoria elektroniczne niskiego napięcia.",
+          detailed_risk_factors: "Syntetycznie: kontrola partii, badania zgodności, procedura wycofania produktu, audyty dostawców, identyfikowalność serii.",
+          claims_history: "Syntetycznie: brak szkód osobowych; 1 akcja jakościowa związana z oznaczeniem opakowań.",
+          territorial_scope: "UE; eksport poza UE wyłącznie w modelu syntetycznym, bez rynku USA/Kanada.",
           sum_guaranteed_amount: 10000000,
           turnover_amount: 25000000,
           rate_primary_per_mille: 3.0,
@@ -562,6 +579,110 @@
           covers_pure_financial_loss: 0,
           covers_employers_liability: 1,
           covers_documents_loss: 0,
+          covers_subcontractors: 1
+        }
+      },
+      law_firm: {
+        label: "Kancelaria prawna",
+        data: {
+          product_family: "oc_zawodowe",
+          insured_activity: "Świadczenie usług prawnych dla klientów korporacyjnych i indywidualnych; scenariusz wyłącznie syntetyczny.",
+          scope_of_insurance: "OC zawodowe za błędy i zaniechania w doradztwie prawnym, reprezentacji i obsłudze dokumentacji.",
+          insured_products: "Doradztwo prawne, sporządzanie opinii i umów, reprezentacja procesowa.",
+          detailed_risk_factors: "Syntetycznie: wielostopniowa akceptacja pism, terminy kontrolowane systemowo, zabezpieczenie tajemnicy zawodowej, procedury antykonfliktowe.",
+          claims_history: "Syntetycznie: brak wypłat odszkodowań; pojedyncze roszczenie prewencyjne zamknięte bez uznania odpowiedzialności.",
+          territorial_scope: "Polska + sporadyczne wsparcie spraw transgranicznych w UE.",
+          sum_guaranteed_amount: 3000000,
+          turnover_amount: 5000000,
+          rate_primary_per_mille: 1.9,
+          premium_amount: 9500,
+          deductible_amount: 10000,
+          usa_canada_included: false,
+          covers_general_liability: 1,
+          covers_professional_liability: 1,
+          covers_product_liability: 0,
+          covers_completed_operations: 0,
+          covers_pure_financial_loss: 1,
+          covers_employers_liability: 0,
+          covers_documents_loss: 1,
+          covers_subcontractors: 0
+        }
+      },
+      architect_designer: {
+        label: "Architekt / projektant",
+        data: {
+          product_family: "oc_zawodowe",
+          insured_activity: "Projektowanie architektoniczne i branżowe dla inwestycji mieszkaniowych i usługowych.",
+          scope_of_insurance: "OC zawodowe za błędy projektowe, odpowiedzialność za dokumentację i koordynację międzybranżową.",
+          insured_products: "Projekty budowlane, projekty wykonawcze, nadzór autorski, uzgodnienia projektowe.",
+          detailed_risk_factors: "Syntetycznie: odpowiedzialność projektowa, kontrola zmian projektowych, walidacja obliczeń, archiwizacja wersji dokumentacji.",
+          claims_history: "Syntetycznie: 1 roszczenie dotyczące kolizji instalacyjnej, zakończone ugodą o niskiej wartości.",
+          territorial_scope: "Polska + projekty koncepcyjne w UE.",
+          sum_guaranteed_amount: 4000000,
+          turnover_amount: 7000000,
+          rate_primary_per_mille: 2.1,
+          premium_amount: 14700,
+          deductible_amount: 12000,
+          usa_canada_included: false,
+          covers_general_liability: 1,
+          covers_professional_liability: 1,
+          covers_product_liability: 0,
+          covers_completed_operations: 0,
+          covers_pure_financial_loss: 1,
+          covers_employers_liability: 0,
+          covers_documents_loss: 1,
+          covers_subcontractors: 1
+        }
+      },
+      it_software_house: {
+        label: "Firma IT / software house",
+        data: {
+          product_family: "oc_zawodowe",
+          insured_activity: "Tworzenie i utrzymanie oprogramowania dla klientów B2B, integracje systemowe, wsparcie serwisowe.",
+          scope_of_insurance: "OC zawodowe za błędy wdrożeniowe, niedostępność usług, naruszenia obowiązków kontraktowych i czyste straty finansowe.",
+          insured_products: "Usługi software development, utrzymanie aplikacji, API, migracje danych.",
+          detailed_risk_factors: "Syntetycznie: dane finansowe klientów, kontrola zmian (CI/CD), testy bezpieczeństwa, backupy i plan odtworzeniowy, umowy SLA.",
+          claims_history: "Syntetycznie: 1 roszczenie za opóźnienie wdrożenia bez potwierdzonej szkody majątkowej.",
+          territorial_scope: "Polska + UE; brak wdrożeń na terytorium USA/Kanada.",
+          sum_guaranteed_amount: 5000000,
+          turnover_amount: 9000000,
+          rate_primary_per_mille: 2.4,
+          premium_amount: 21600,
+          deductible_amount: 15000,
+          usa_canada_included: false,
+          covers_general_liability: 1,
+          covers_professional_liability: 1,
+          covers_product_liability: 0,
+          covers_completed_operations: 1,
+          covers_pure_financial_loss: 1,
+          covers_employers_liability: 0,
+          covers_documents_loss: 1,
+          covers_subcontractors: 1
+        }
+      },
+      business_consulting: {
+        label: "Doradztwo biznesowe",
+        data: {
+          product_family: "oc_zawodowe",
+          insured_activity: "Doradztwo strategiczne i operacyjne dla przedsiębiorstw, optymalizacja procesów i wsparcie transformacji.",
+          scope_of_insurance: "OC zawodowe za rekomendacje doradcze, błędy analityczne i skutki finansowe decyzji klienta.",
+          insured_products: "Usługi konsultingowe, analizy biznesowe, projekty optymalizacyjne i PMO.",
+          detailed_risk_factors: "Syntetycznie: czyste straty finansowe, odpowiedzialność za rekomendacje, wersjonowanie raportów, przegląd jakości deliverables.",
+          claims_history: "Syntetycznie: brak szkód zgłoszonych w ostatnich 4 latach polisowych.",
+          territorial_scope: "Polska i UE.",
+          sum_guaranteed_amount: 2500000,
+          turnover_amount: 4200000,
+          rate_primary_per_mille: 1.8,
+          premium_amount: 7560,
+          deductible_amount: 8000,
+          usa_canada_included: false,
+          covers_general_liability: 1,
+          covers_professional_liability: 1,
+          covers_product_liability: 0,
+          covers_completed_operations: 0,
+          covers_pure_financial_loss: 1,
+          covers_employers_liability: 0,
+          covers_documents_loss: 1,
           covers_subcontractors: 1
         }
       }
@@ -584,10 +705,10 @@
     const DEMO_FILL_VALUES = {
       rate_primary_per_mille: 1.75,
       deductible_amount: 5000,
-      insured_products: "Synthetic insured products/services bundle for demo underwriting iteration.",
-      detailed_risk_factors: "Synthetic risk factors: documented controls, staff training cadence, preventive maintenance and incident escalation workflow.",
-      claims_history: "Synthetic claims history: no severe claims in last 3 policy years; isolated low-severity event handled internally.",
-      territorial_scope: "Synthetic territorial scope: Poland + EU (excluding sanctioned territories).",
+      insured_products: "Syntetyczny pakiet: usługi podstawowe + usługi pomocnicze + elementy produktu adekwatne do profilu działalności.",
+      detailed_risk_factors: "Syntetyczne czynniki: udokumentowane procedury, szkolenia personelu, rejestr incydentów, działania prewencyjne i audyty wewnętrzne.",
+      claims_history: "Syntetycznie: brak szkód ciężkich w ostatnich 3 latach polisowych; pojedyncze zdarzenie niskiej wartości bez sporu.",
+      territorial_scope: "Polska + UE (zakres syntetyczny, bez obszarów sankcyjnych).",
       usa_canada_included: "false"
     };
     let lastMissingFields = [];
@@ -600,7 +721,7 @@
       if (Number.isNaN(n)) {
         return String(value);
       }
-      return new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(n);
+      return new Intl.NumberFormat("pl-PL", { maximumFractionDigits: 2 }).format(n);
     }
 
     function setScenarioOptions() {
@@ -646,11 +767,11 @@
       document.getElementById("errorBox").hidden = true;
       document.getElementById("errorBox").textContent = "";
       document.getElementById("loading").hidden = true;
-      document.getElementById("productResult").innerHTML = '<span class="muted">No result yet.</span>';
-      document.getElementById("premiumResult").innerHTML = '<span class="muted">No result yet.</span>';
-      document.getElementById("llmResult").innerHTML = '<span class="muted">No result yet.</span>';
+      document.getElementById("productResult").innerHTML = '<span class="muted">Brak wyniku.</span>';
+      document.getElementById("premiumResult").innerHTML = '<span class="muted">Brak wyniku.</span>';
+      document.getElementById("llmResult").innerHTML = '<span class="muted">Brak wyniku.</span>';
       document.getElementById("llmExplanationBox").hidden = true;
-      document.getElementById("llmExplanationText").textContent = "No explanation yet.";
+      document.getElementById("llmExplanationText").textContent = "Brak uzasadnienia.";
       document.getElementById("jsonResult").textContent = "{}";
       lastMissingFields = [];
     }
@@ -711,37 +832,37 @@
 
     function renderProductCard(product) {
       if (!product) {
-        return '<span class="muted">No product prediction in response.</span>';
+        return '<span class="muted">Brak predykcji produktu w odpowiedzi.</span>';
       }
 
       return `
         <div class="metric"><strong>product_family:</strong> ${product.product_family ?? "—"}</div>
         <div class="metric"><strong>confidence:</strong> ${product.confidence ?? "—"}</div>
-        <div class="metric"><strong>reason:</strong> ${product.reason ?? "—"}</div>
+        <div class="metric"><strong>powód:</strong> ${product.reason ?? "—"}</div>
       `;
     }
 
     function renderPremiumCard(premium) {
       if (!premium) {
-        return '<span class="muted">No premium estimation in response.</span>';
+        return '<span class="muted">Brak estymacji składki w odpowiedzi.</span>';
       }
 
       return `
         <div class="metric"><strong>method:</strong> ${premium.method ?? "—"}</div>
         <div class="metric"><strong>estimated:</strong> ${fmtAmount(premium.estimated)}</div>
-        <div class="metric"><strong>reason:</strong> ${premium.reason ?? "—"}</div>
+        <div class="metric"><strong>powód:</strong> ${premium.reason ?? "—"}</div>
       `;
     }
 
     function renderLlmCard(llm) {
       if (!llm) {
-        return '<span class="muted">No llm_estimation in response.</span>';
+        return '<span class="muted">Brak llm_estimation w odpowiedzi.</span>';
       }
 
       const statusClass = String(llm.status || "fallback").toLowerCase();
       const missingData = Array.isArray(llm.missing_data) && llm.missing_data.length
         ? llm.missing_data.join(", ")
-        : "none";
+        : "brak";
 
       return `
         <div class="status ${statusClass}">${llm.status ?? "unknown"}</div>
@@ -749,9 +870,9 @@
         <div class="metric"><strong>premium_range_low:</strong> ${fmtAmount(llm.premium_range_low)}</div>
         <div class="metric"><strong>premium_range_high:</strong> ${fmtAmount(llm.premium_range_high)}</div>
         <div class="metric"><strong>confidence:</strong> ${llm.confidence ?? "—"}</div>
-        <div class="metric"><strong>reason:</strong> ${llm.reason ?? "—"}</div>
+        <div class="metric"><strong>powód:</strong> ${llm.reason ?? "—"}</div>
         <div class="metric"><strong>missing_data:</strong> ${missingData}</div>
-        <div class="metric"><strong>HITL warning:</strong> ${llm.hitl_required ? "Underwriter review required" : "No"}</div>
+        <div class="metric"><strong>ostrzeżenie HITL:</strong> ${llm.hitl_required ? "Wymagany przegląd underwritera" : "Nie"}</div>
       `;
     }
 
@@ -778,6 +899,26 @@
           el.value = String(value);
         }
       });
+    }
+
+    function applyRiskHelpers() {
+      const riskInputs = Array.from(document.querySelectorAll(".risk-helper"));
+      const selected = riskInputs.filter((el) => el.checked).map((el) => el.dataset.label);
+      const riskText = selected.length ? `Wybrane ryzyka: ${selected.join(", ")}.` : "";
+      const riskArea = document.getElementById("detailed_risk_factors");
+      if (riskText) {
+        if (!riskArea.value.includes(riskText)) {
+          riskArea.value = riskArea.value ? `${riskArea.value}\n${riskText}` : riskText;
+        }
+      }
+
+      const hasUsaCanada = selected.includes("USA/Kanada");
+      document.getElementById("usa_canada_included").value = hasUsaCanada ? "true" : "false";
+      if (selected.includes("podwykonawcy")) document.getElementById("covers_subcontractors").checked = true;
+      if (selected.includes("szkody w dokumentach")) document.getElementById("covers_documents_loss").checked = true;
+      if (selected.includes("czyste straty finansowe")) document.getElementById("covers_pure_financial_loss").checked = true;
+      if (selected.includes("odpowiedzialność projektowa")) document.getElementById("covers_professional_liability").checked = true;
+      if (selected.includes("eksport produktu")) document.getElementById("covers_product_liability").checked = true;
     }
 
     async function submitUnderwrite() {
@@ -810,7 +951,7 @@
         try {
           data = JSON.parse(responseText);
         } catch {
-          throw new Error("API returned non-JSON response.");
+          throw new Error("API zwróciło odpowiedź inną niż JSON.");
         }
 
         if (!response.ok) {
@@ -822,14 +963,14 @@
         document.getElementById("premiumResult").innerHTML = renderPremiumCard(data.premium_estimation);
         document.getElementById("llmResult").innerHTML = renderLlmCard(data.llm_estimation);
         const explanationEl = document.getElementById("llmExplanationText");
-        explanationEl.textContent = data.llm_estimation?.explanation || "No explanation provided.";
+        explanationEl.textContent = data.llm_estimation?.explanation || "Brak uzasadnienia w odpowiedzi.";
         document.getElementById("llmExplanationBox").hidden = false;
         lastMissingFields = Array.isArray(data.llm_estimation?.missing_data) ? data.llm_estimation.missing_data : [];
         highlightMissingFields(lastMissingFields);
         document.getElementById("jsonResult").textContent = JSON.stringify(data, null, 2);
       } catch (error) {
         errorEl.hidden = false;
-        errorEl.textContent = `Request failed: ${error.message}`;
+        errorEl.textContent = `Nie udało się wykonać żądania: ${error.message}`;
       } finally {
         loadingEl.hidden = true;
         submitBtn.disabled = false;
@@ -840,6 +981,7 @@
     document.getElementById("reloadScenarioBtn").addEventListener("click", loadScenario);
     document.getElementById("fillMissingBtn").addEventListener("click", fillMissingWithDemoData);
     document.getElementById("submitBtn").addEventListener("click", submitUnderwrite);
+    document.querySelectorAll(".risk-helper").forEach((input) => input.addEventListener("change", applyRiskHelpers));
 
     setScenarioOptions();
     loadScenario();

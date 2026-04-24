@@ -69,12 +69,14 @@ Widok prezentuje osobno:
 - zakres składki,
 - confidence,
 - missing data,
-- ostrzeżenie: "LLM estimate is indicative only and requires underwriter review."
+- ostrzeżenie: "Estymacja LLM jest orientacyjna i wymaga przeglądu underwritera."
 - wyeksponowane `llm_estimation.explanation` nad sekcją raw JSON,
 - raw JSON w sekcji rozwijanej (`details`),
 - podświetlanie pól wejściowych, które LLM oznaczył w `missing_data`,
 - helper pod brakującymi polami: `LLM wskazał, że ta informacja poprawiłaby jakość estymacji.`,
 - przycisk `Uzupełnij przykładowymi danymi` do szybkiego uzupełniania braków bez użycia danych rzeczywistych.
+- polskie scenariusze branżowe: restauracja/catering, zarządzanie nieruchomościami, biuro rachunkowe, wykonawca budowlany, producent (OC za produkt), kancelaria prawna, architekt/projektant, firma IT/software house, doradztwo biznesowe,
+- pomocnicze checkboxy czynników ryzyka (np. `podwykonawcy`, `roboty gorące`, `USA/Kanada`, `żywność / alergeny`) automatycznie wzbogacające `detailed_risk_factors`.
 
 Formularz underwriting questionnaire zawiera edytowalne pola m.in.:
 
