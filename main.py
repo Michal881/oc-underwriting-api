@@ -1,10 +1,13 @@
+import json
+import os
 from typing import Optional
+from urllib import error, request
 
+import joblib
+import pandas as pd
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import pandas as pd
-import joblib
 
 
 bundle = joblib.load("premium_model.joblib")
@@ -51,6 +54,12 @@ class ProductInput(BaseModel):
     insured_products: Optional[str] = None
 
 
+class UnderwriteResult(BaseModel):
+    product_prediction: dict
+    premium_estimation: dict
+    llm_explanation: dict
+
+
 def classify_premium(row):
     if row.get("turnover_amount") and row.get("rate_primary_per_mille"):
         calc = row["turnover_amount"] * row["rate_primary_per_mille"] / 1000
@@ -59,9 +68,9 @@ def classify_premium(row):
             if ratio:
                 if 0.7 < ratio < 0.9:
                     return "minimum_deposit"
-                elif 0.9 < ratio < 1.1:
+                if 0.9 < ratio < 1.1:
                     return "pure_rate"
-                elif ratio > 2:
+                if ratio > 2:
                     return "minimum_override"
         return "rate"
 
@@ -172,6 +181,84 @@ def predict_product(data):
     }
 
 
+def generate_underwriting_explanation(policy_data, product_prediction, premium_estimation):
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        return {
+            "provider": "fallback",
+            "model": None,
+            "content": (
+                "Brak OPENAI_API_KEY. Decyzja oparta na regułach/ML: "
+                f"produkt={product_prediction.get('product_family')}, "
+                f"metoda_składki={premium_estimation.get('method')}, "
+                f"powód={premium_estimation.get('reason')}."
+            ),
+        }
+
+    model_name = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    prompt = {
+        "policy": {
+            "product_family": policy_data.get("product_family"),
+            "insured_activity": policy_data.get("insured_activity"),
+            "scope_of_insurance": policy_data.get("scope_of_insurance"),
+            "sum_guaranteed_amount": policy_data.get("sum_guaranteed_amount"),
+            "premium_amount": policy_data.get("premium_amount"),
+            "turnover_amount": policy_data.get("turnover_amount"),
+            "rate_primary_per_mille": policy_data.get("rate_primary_per_mille"),
+        },
+        "product_prediction": product_prediction,
+        "premium_estimation": premium_estimation,
+        "instructions": (
+            "Napisz krótkie uzasadnienie underwritingowe po polsku (max 5 zdań). "
+            "Uwzględnij ryzyka i zalecenia do manualnego underwritingu."
+        ),
+    }
+
+    body = {
+        "model": model_name,
+        "input": [
+            {
+                "role": "user",
+                "content": [{"type": "input_text", "text": json.dumps(prompt, ensure_ascii=False)}],
+            }
+        ],
+    }
+
+    req = request.Request(
+        "https://api.openai.com/v1/responses",
+        data=json.dumps(body).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+
+    try:
+        with request.urlopen(req, timeout=15) as response:
+            parsed = json.loads(response.read().decode("utf-8"))
+            content = parsed.get("output_text")
+            if not content:
+                content = "LLM nie zwrócił output_text; użyj manualnej oceny ryzyka."
+            return {
+                "provider": "openai",
+                "model": model_name,
+                "content": content,
+            }
+    except error.HTTPError as exc:
+        return {
+            "provider": "openai",
+            "model": model_name,
+            "content": f"Błąd HTTP z API LLM: {exc.code}. Użyj manualnej oceny.",
+        }
+    except error.URLError as exc:
+        return {
+            "provider": "openai",
+            "model": model_name,
+            "content": f"Błąd połączenia z API LLM: {exc.reason}. Użyj manualnej oceny.",
+        }
+
+
 @app.get("/")
 def root():
     return {"status": "API działa"}
@@ -192,10 +279,14 @@ def predict_product_endpoint(policy: ProductInput):
     return predict_product(policy.model_dump())
 
 
-@app.post("/underwrite")
+@app.post("/underwrite", response_model=UnderwriteResult)
 def underwrite(policy: PolicyInput):
     data = policy.model_dump()
+    product_prediction = predict_product(data)
+    premium_estimation = estimate(data)
+    llm_explanation = generate_underwriting_explanation(data, product_prediction, premium_estimation)
     return {
-        "product_prediction": predict_product(data),
-        "premium_estimation": estimate(data),
+        "product_prediction": product_prediction,
+        "premium_estimation": premium_estimation,
+        "llm_explanation": llm_explanation,
     }
