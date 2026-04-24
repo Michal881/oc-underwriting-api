@@ -1,6 +1,7 @@
 from typing import Optional
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import pandas as pd
 import joblib
@@ -11,6 +12,14 @@ model = bundle["model"]
 features = bundle["features"]
 
 app = FastAPI(title="OC Underwriting API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 class PolicyInput(BaseModel):
@@ -45,10 +54,8 @@ class ProductInput(BaseModel):
 def classify_premium(row):
     if row.get("turnover_amount") and row.get("rate_primary_per_mille"):
         calc = row["turnover_amount"] * row["rate_primary_per_mille"] / 1000
-
         if row.get("premium_amount"):
             ratio = row["premium_amount"] / calc if calc != 0 else None
-
             if ratio:
                 if 0.7 < ratio < 0.9:
                     return "minimum_deposit"
@@ -56,10 +63,9 @@ def classify_premium(row):
                     return "pure_rate"
                 elif ratio > 2:
                     return "minimum_override"
-
         return "rate"
 
-    elif row.get("premium_amount"):
+    if row.get("premium_amount"):
         return "flat"
 
     return "unknown"
@@ -80,12 +86,7 @@ def add_features(df):
     keywords = ["budowl", "produkc", "doradzt", "praw", "księg"]
 
     for kw in keywords:
-        df[f"kw_{kw}"] = (
-            df["insured_activity"]
-            .str.lower()
-            .str.contains(kw)
-            .astype(int)
-        )
+        df[f"kw_{kw}"] = df["insured_activity"].str.lower().str.contains(kw).astype(int)
 
     return df
 
@@ -96,14 +97,12 @@ def estimate(policy_dict):
 
     if premium_type in ["pure_rate", "minimum_deposit", "rate"]:
         calc = row["turnover_amount"] * row["rate_primary_per_mille"] / 1000
-
         if premium_type == "minimum_deposit":
             return {
                 "method": "rate_minimum",
                 "estimated": calc * 0.8,
                 "reason": "turnover × rate × 0.8",
             }
-
         return {
             "method": "rate",
             "estimated": calc,
@@ -152,14 +151,14 @@ def predict_product(data):
             "reason": "wykryto sygnały działalności zawodowej",
         }
 
-    if any(x in text for x in ["produkt", "produkc", "sprzedaż", "wyrób", "wykonane usługi", "completed operations"]):
+    if any(x in text for x in ["produkt", "produkc", "sprzedaż", "wyrób", "wykonane usługi"]):
         return {
             "product_family": "oc_produkt_lub_mieszane",
             "confidence": "medium",
-            "reason": "wykryto sygnały produkcji, produktu lub wykonanych usług",
+            "reason": "wykryto sygnały produktu / produkcji",
         }
 
-    if any(x in text for x in ["nieruchomo", "posiadanie", "zarządzanie", "oc ogólna", "prowadzonej działalności"]):
+    if any(x in text for x in ["nieruchomo", "posiadanie", "zarządzanie", "oc ogólna"]):
         return {
             "product_family": "oc_ogolne",
             "confidence": "medium",
@@ -196,11 +195,7 @@ def predict_product_endpoint(policy: ProductInput):
 @app.post("/underwrite")
 def underwrite(policy: PolicyInput):
     data = policy.model_dump()
-
-    product = predict_product(data)
-    premium = estimate(data)
-
     return {
-        "product_prediction": product,
-        "premium_estimation": premium,
+        "product_prediction": predict_product(data),
+        "premium_estimation": estimate(data),
     }
