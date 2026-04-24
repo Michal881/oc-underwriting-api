@@ -407,9 +407,9 @@
       </div>
 
       <div class="actions">
-        <button id="submitBtn" class="primary" type="button">Uruchom /underwrite</button>
+        <button id="submitBtn" class="primary" type="button">Uruchom underwriting</button>
         <button id="fillMissingBtn" class="secondary" type="button">Uzupełnij przykładowymi danymi</button>
-        <button id="reloadScenarioBtn" class="secondary" type="button">Wczytaj ponownie wybrany scenariusz</button>
+        <button id="reloadScenarioBtn" class="secondary" type="button">Wczytaj ponownie scenariusz</button>
       </div>
       <p id="loading" class="loading" hidden>Wysyłanie zapytania i oczekiwanie na odpowiedź...</p>
       <div id="errorBox" class="banner danger" hidden></div>
@@ -421,24 +421,24 @@
 
       <div class="result-grid">
         <article class="result-card">
-          <h4>Predykcja produktu</h4>
+          <h4>Rozpoznanie produktu</h4>
           <div id="productResult" class="muted">Brak wyniku.</div>
         </article>
 
         <article class="result-card">
-          <h4>Estymacja składki (ML/reguły)</h4>
+          <h4>Estymacja ML/reguły</h4>
           <div id="premiumResult" class="muted">Brak wyniku.</div>
         </article>
 
         <article class="result-card">
-          <h4>Estymacja orientacyjna LLM</h4>
+          <h4>Estymacja LLM</h4>
           <div id="llmResult" class="muted">Brak wyniku.</div>
         </article>
       </div>
 
       <div id="llmExplanationBox" class="explanation-box" hidden>
-        <h3>Uzasadnienie LLM</h3>
-        <div id="llmExplanationText" class="muted">Brak uzasadnienia.</div>
+        <h3>Wyjaśnienie LLM</h3>
+        <div id="llmExplanationText" class="muted">Brak wyjaśnienia.</div>
       </div>
 
       <details class="raw-json">
@@ -771,7 +771,7 @@
       document.getElementById("premiumResult").innerHTML = '<span class="muted">Brak wyniku.</span>';
       document.getElementById("llmResult").innerHTML = '<span class="muted">Brak wyniku.</span>';
       document.getElementById("llmExplanationBox").hidden = true;
-      document.getElementById("llmExplanationText").textContent = "Brak uzasadnienia.";
+      document.getElementById("llmExplanationText").textContent = "Brak wyjaśnienia.";
       document.getElementById("jsonResult").textContent = "{}";
       lastMissingFields = [];
     }
@@ -818,7 +818,8 @@
 
       numericFields.forEach((field) => {
         const rawValue = document.getElementById(field).value;
-        payload[field] = rawValue === "" ? null : Number(rawValue);
+        const cleanedValue = String(rawValue ?? "").trim();
+        payload[field] = cleanedValue === "" ? null : Number(cleanedValue);
       });
 
       payload.usa_canada_included = document.getElementById("usa_canada_included").value === "true";
@@ -830,15 +831,23 @@
       return payload;
     }
 
+    function syncPremiumFromRateAndTurnover(payload) {
+      if (payload.turnover_amount === null || payload.rate_primary_per_mille === null) return payload;
+      payload.premium_amount = Number((payload.turnover_amount * payload.rate_primary_per_mille) / 1000);
+      const premiumInput = document.getElementById("premium_amount");
+      if (premiumInput) premiumInput.value = String(payload.premium_amount);
+      return payload;
+    }
+
     function renderProductCard(product) {
       if (!product) {
         return '<span class="muted">Brak predykcji produktu w odpowiedzi.</span>';
       }
 
       return `
-        <div class="metric"><strong>product_family:</strong> ${product.product_family ?? "—"}</div>
-        <div class="metric"><strong>confidence:</strong> ${product.confidence ?? "—"}</div>
-        <div class="metric"><strong>powód:</strong> ${product.reason ?? "—"}</div>
+        <div class="metric"><strong>Rodzina produktu:</strong> ${product.product_family ?? "—"}</div>
+        <div class="metric"><strong>Pewność:</strong> ${product.confidence ?? "—"}</div>
+        <div class="metric"><strong>Uzasadnienie:</strong> ${product.reason ?? "—"}</div>
       `;
     }
 
@@ -848,9 +857,9 @@
       }
 
       return `
-        <div class="metric"><strong>method:</strong> ${premium.method ?? "—"}</div>
-        <div class="metric"><strong>estimated:</strong> ${fmtAmount(premium.estimated)}</div>
-        <div class="metric"><strong>powód:</strong> ${premium.reason ?? "—"}</div>
+        <div class="metric"><strong>Metoda:</strong> ${premium.method ?? "—"}</div>
+        <div class="metric"><strong>Wartość estymowana:</strong> ${fmtAmount(premium.estimated)}</div>
+        <div class="metric"><strong>Uzasadnienie:</strong> ${premium.reason ?? "—"}</div>
       `;
     }
 
@@ -865,14 +874,14 @@
         : "brak";
 
       return `
-        <div class="status ${statusClass}">${llm.status ?? "unknown"}</div>
-        <div class="metric"><strong>estimated_premium:</strong> ${fmtAmount(llm.estimated_premium)}</div>
-        <div class="metric"><strong>premium_range_low:</strong> ${fmtAmount(llm.premium_range_low)}</div>
-        <div class="metric"><strong>premium_range_high:</strong> ${fmtAmount(llm.premium_range_high)}</div>
-        <div class="metric"><strong>confidence:</strong> ${llm.confidence ?? "—"}</div>
-        <div class="metric"><strong>powód:</strong> ${llm.reason ?? "—"}</div>
-        <div class="metric"><strong>missing_data:</strong> ${missingData}</div>
-        <div class="metric"><strong>ostrzeżenie HITL:</strong> ${llm.hitl_required ? "Wymagany przegląd underwritera" : "Nie"}</div>
+        <div class="status ${statusClass}">${llm.status ?? "nieznany"}</div>
+        <div class="metric"><strong>Składka estymowana:</strong> ${fmtAmount(llm.estimated_premium)}</div>
+        <div class="metric"><strong>Dolny zakres składki:</strong> ${fmtAmount(llm.premium_range_low)}</div>
+        <div class="metric"><strong>Górny zakres składki:</strong> ${fmtAmount(llm.premium_range_high)}</div>
+        <div class="metric"><strong>Pewność:</strong> ${llm.confidence ?? "—"}</div>
+        <div class="metric"><strong>Uzasadnienie:</strong> ${llm.reason ?? "—"}</div>
+        <div class="metric"><strong>Brakujące dane:</strong> ${missingData}</div>
+        <div class="metric"><strong>Wymagana ocena underwritera:</strong> ${llm.hitl_required ? "Tak" : "Nie"}</div>
       `;
     }
 
@@ -922,7 +931,9 @@
     }
 
     async function submitUnderwrite() {
-      const payload = collectPayload();
+      clearStatusAndResults();
+
+      const payload = syncPremiumFromRateAndTurnover(collectPayload());
       const requestBody = {
         ...payload,
         deductible_amount: payload.deductible_amount,
@@ -955,15 +966,14 @@
         }
 
         if (!response.ok) {
-          const detail = data && data.detail ? ` | detail: ${JSON.stringify(data.detail)}` : "";
-          throw new Error(`HTTP ${response.status}${detail}`);
+          throw new Error(`HTTP ${response.status}: ${responseText}`);
         }
 
         document.getElementById("productResult").innerHTML = renderProductCard(data.product_prediction);
         document.getElementById("premiumResult").innerHTML = renderPremiumCard(data.premium_estimation);
         document.getElementById("llmResult").innerHTML = renderLlmCard(data.llm_estimation);
         const explanationEl = document.getElementById("llmExplanationText");
-        explanationEl.textContent = data.llm_estimation?.explanation || "Brak uzasadnienia w odpowiedzi.";
+        explanationEl.textContent = data.llm_estimation?.explanation || "Brak wyjaśnienia w odpowiedzi.";
         document.getElementById("llmExplanationBox").hidden = false;
         lastMissingFields = Array.isArray(data.llm_estimation?.missing_data) ? data.llm_estimation.missing_data : [];
         highlightMissingFields(lastMissingFields);
