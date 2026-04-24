@@ -17,6 +17,8 @@
     button:hover { background:#374151; }
     pre { background:#111827; color:#d1fae5; padding:18px; border-radius:14px; overflow-x:auto; }
     .badge { display:inline-block; padding:6px 10px; border-radius:999px; background:#e5e7eb; margin:0 8px 8px 0; font-size:13px; }
+    .warning { margin-top:8px; color:#92400e; background:#fef3c7; border:1px solid #fcd34d; border-radius:10px; padding:10px; font-size:14px; }
+    .metric { margin:6px 0; }
   </style>
 </head>
 <body>
@@ -71,13 +73,22 @@
       </div>
     </div>
 
+    <div class="grid">
+      <div>
+        <label>Franszyza redukcyjna / deductible_amount</label>
+        <input id="deductible_amount" type="number" />
+      </div>
+      <div></div>
+    </div>
+
     <button onclick="sendRequest()">Uruchom underwriting</button>
   </div>
 
   <div class="card">
     <h2>Wynik</h2>
     <div id="summary"></div>
-    <div id="llm" class="subtitle" style="margin:10px 0 14px 0;"></div>
+    <div id="estimates"></div>
+    <div id="warning" class="warning" style="display:none;">LLM estimate is indicative only and requires underwriter review.</div>
     <pre id="result">Wybierz scenariusz i kliknij „Uruchom underwriting”.</pre>
   </div>
 
@@ -95,7 +106,8 @@ const scenarios = {
     sum: 5000000,
     premium: 30000,
     turnover: "",
-    rate: ""
+    rate: "",
+    deductible_amount: 5000
   },
   architect: {
     product_family: "oc_zawodowe",
@@ -104,7 +116,8 @@ const scenarios = {
     sum: 1000000,
     premium: 12000,
     turnover: "",
-    rate: ""
+    rate: "",
+    deductible_amount: 10000
   },
   product: {
     product_family: "oc_produkt_lub_mieszane",
@@ -113,7 +126,8 @@ const scenarios = {
     sum: 10000000,
     premium: 120960,
     turnover: "",
-    rate: ""
+    rate: "",
+    deductible_amount: 15000
   },
   property: {
     product_family: "oc_ogolne",
@@ -122,7 +136,8 @@ const scenarios = {
     sum: 3000000,
     premium: 9100,
     turnover: "",
-    rate: ""
+    rate: "",
+    deductible_amount: 3000
   },
   large: {
     product_family: "oc_ogolne",
@@ -131,7 +146,8 @@ const scenarios = {
     sum: 30000000,
     premium: 500000,
     turnover: "",
-    rate: ""
+    rate: "",
+    deductible_amount: 50000
   },
   rate: {
     product_family: "oc_ogolne",
@@ -140,7 +156,8 @@ const scenarios = {
     sum: 5000000,
     premium: "",
     turnover: 20000000,
-    rate: 0.75
+    rate: 0.75,
+    deductible_amount: 10000
   }
 };
 
@@ -154,16 +171,24 @@ function loadScenario() {
   document.getElementById("premium").value = s.premium;
   document.getElementById("turnover").value = s.turnover;
   document.getElementById("rate").value = s.rate;
+  document.getElementById("deductible_amount").value = s.deductible_amount;
 
   document.getElementById("summary").innerHTML = "";
-  document.getElementById("llm").textContent = "";
+  document.getElementById("estimates").innerHTML = "";
+  document.getElementById("warning").style.display = "none";
   document.getElementById("result").textContent = "Kliknij „Uruchom underwriting”.";
+}
+
+function formatAmount(value) {
+  if (value === null || value === undefined) return "brak";
+  return new Intl.NumberFormat("pl-PL", { maximumFractionDigits: 2 }).format(value);
 }
 
 async function sendRequest() {
   const premiumValue = document.getElementById("premium").value;
   const turnoverValue = document.getElementById("turnover").value;
   const rateValue = document.getElementById("rate").value;
+  const deductibleValue = document.getElementById("deductible_amount").value;
 
   const scenario = document.getElementById("scenario").value;
 
@@ -175,6 +200,7 @@ async function sendRequest() {
     premium_amount: premiumValue ? Number(premiumValue) : null,
     turnover_amount: turnoverValue ? Number(turnoverValue) : null,
     rate_primary_per_mille: rateValue ? Number(rateValue) : null,
+    deductible_amount: deductibleValue ? Number(deductibleValue) : null,
 
     covers_general_liability: 1,
     covers_professional_liability: scenario === "law" || scenario === "architect" ? 1 : 0,
@@ -187,7 +213,8 @@ async function sendRequest() {
   };
 
   document.getElementById("summary").innerHTML = "";
-  document.getElementById("llm").textContent = "";
+  document.getElementById("estimates").innerHTML = "";
+  document.getElementById("warning").style.display = "none";
   document.getElementById("result").textContent = "Przetwarzanie...";
 
   try {
@@ -202,14 +229,25 @@ async function sendRequest() {
     }
 
     const result = await response.json();
+    const llm = result.llm_estimation || {};
 
     document.getElementById("summary").innerHTML = `
       <span class="badge">Produkt: ${result.product_prediction.product_family}</span>
-      <span class="badge">Confidence: ${result.product_prediction.confidence}</span>
-      <span class="badge">Metoda składki: ${result.premium_estimation.method}</span>
+      <span class="badge">Confidence produktu: ${result.product_prediction.confidence}</span>
+      <span class="badge">Metoda ML/reguły: ${result.premium_estimation.method}</span>
     `;
 
-    document.getElementById("llm").textContent = "LLM: " + (result.llm_explanation?.content || "brak");
+    document.getElementById("estimates").innerHTML = `
+      <p class="metric"><strong>ML/rules estimate:</strong> ${formatAmount(result.premium_estimation.estimated)}</p>
+      <p class="metric"><strong>LLM indicative estimate:</strong> ${formatAmount(llm.estimated_premium)}</p>
+      <p class="metric"><strong>Premium range:</strong> ${formatAmount(llm.premium_range_low)} - ${formatAmount(llm.premium_range_high)}</p>
+      <p class="metric"><strong>Confidence:</strong> ${llm.confidence || "brak"}</p>
+      <p class="metric"><strong>Missing data:</strong> ${(llm.missing_data || []).join(", ") || "brak"}</p>
+      <p class="metric"><strong>Status:</strong> ${llm.status || "brak"}</p>
+      <p class="metric"><strong>Reason:</strong> ${llm.reason || "brak"}</p>
+    `;
+
+    document.getElementById("warning").style.display = "block";
     document.getElementById("result").textContent = JSON.stringify(result, null, 2);
 
   } catch (error) {

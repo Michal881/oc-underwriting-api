@@ -1,13 +1,13 @@
 import json
 import os
-from typing import Optional
+from typing import Literal, Optional
 from urllib import error, request
 
 import joblib
 import pandas as pd
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 bundle = joblib.load("premium_model.joblib")
@@ -35,6 +35,7 @@ class PolicyInput(BaseModel):
     turnover_amount: Optional[float] = None
     rate_primary_per_mille: Optional[float] = None
     premium_amount: Optional[float] = None
+    deductible_amount: Optional[float] = None
     usa_canada_included: bool = False
 
     covers_general_liability: int = 0
@@ -54,10 +55,21 @@ class ProductInput(BaseModel):
     insured_products: Optional[str] = None
 
 
+class LLMEstimation(BaseModel):
+    status: Literal["enabled", "disabled", "error", "fallback"]
+    estimated_premium: Optional[float]
+    premium_range_low: Optional[float]
+    premium_range_high: Optional[float]
+    confidence: Literal["low", "medium", "high"]
+    reason: str
+    missing_data: list[str] = Field(default_factory=list)
+    hitl_required: bool = True
+
+
 class UnderwriteResult(BaseModel):
     product_prediction: dict
     premium_estimation: dict
-    llm_explanation: dict
+    llm_estimation: LLMEstimation
 
 
 def classify_premium(row):
@@ -181,21 +193,84 @@ def predict_product(data):
     }
 
 
-def generate_underwriting_explanation(policy_data, product_prediction, premium_estimation):
+def _disabled_llm_estimation(reason: str) -> LLMEstimation:
+    return LLMEstimation(
+        status="disabled",
+        estimated_premium=None,
+        premium_range_low=None,
+        premium_range_high=None,
+        confidence="low",
+        reason=reason,
+        missing_data=[],
+        hitl_required=True,
+    )
+
+
+def _error_llm_estimation(reason: str) -> LLMEstimation:
+    return LLMEstimation(
+        status="error",
+        estimated_premium=None,
+        premium_range_low=None,
+        premium_range_high=None,
+        confidence="low",
+        reason=reason,
+        missing_data=[],
+        hitl_required=True,
+    )
+
+
+def _fallback_llm_estimation(reason: str, premium_estimation: dict) -> LLMEstimation:
+    base_estimate = premium_estimation.get("estimated")
+    if isinstance(base_estimate, (int, float)):
+        low = round(float(base_estimate) * 0.8, 2)
+        high = round(float(base_estimate) * 1.2, 2)
+    else:
+        low = None
+        high = None
+
+    return LLMEstimation(
+        status="fallback",
+        estimated_premium=float(base_estimate) if isinstance(base_estimate, (int, float)) else None,
+        premium_range_low=low,
+        premium_range_high=high,
+        confidence="low",
+        reason=reason,
+        missing_data=[],
+        hitl_required=True,
+    )
+
+
+def generate_llm_estimation(policy_data, product_prediction, premium_estimation) -> LLMEstimation:
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
-        return {
-            "provider": "fallback",
-            "model": None,
-            "content": (
-                "Brak OPENAI_API_KEY. Decyzja oparta na regułach/ML: "
-                f"produkt={product_prediction.get('product_family')}, "
-                f"metoda_składki={premium_estimation.get('method')}, "
-                f"powód={premium_estimation.get('reason')}."
-            ),
-        }
+        return _disabled_llm_estimation("OPENAI_API_KEY not configured")
 
     model_name = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    schema = {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "status": {"type": "string", "enum": ["enabled", "fallback"]},
+            "estimated_premium": {"type": ["number", "null"]},
+            "premium_range_low": {"type": ["number", "null"]},
+            "premium_range_high": {"type": ["number", "null"]},
+            "confidence": {"type": "string", "enum": ["low", "medium", "high"]},
+            "reason": {"type": "string"},
+            "missing_data": {"type": "array", "items": {"type": "string"}},
+            "hitl_required": {"type": "boolean"},
+        },
+        "required": [
+            "status",
+            "estimated_premium",
+            "premium_range_low",
+            "premium_range_high",
+            "confidence",
+            "reason",
+            "missing_data",
+            "hitl_required",
+        ],
+    }
+
     prompt = {
         "policy": {
             "product_family": policy_data.get("product_family"),
@@ -205,12 +280,16 @@ def generate_underwriting_explanation(policy_data, product_prediction, premium_e
             "premium_amount": policy_data.get("premium_amount"),
             "turnover_amount": policy_data.get("turnover_amount"),
             "rate_primary_per_mille": policy_data.get("rate_primary_per_mille"),
+            "deductible_amount": policy_data.get("deductible_amount"),
+            "usa_canada_included": policy_data.get("usa_canada_included"),
         },
         "product_prediction": product_prediction,
         "premium_estimation": premium_estimation,
         "instructions": (
-            "Napisz krótkie uzasadnienie underwritingowe po polsku (max 5 zdań). "
-            "Uwzględnij ryzyka i zalecenia do manualnego underwritingu."
+            "Provide indicative, non-binding premium estimate for human-in-the-loop underwriting review. "
+            "The estimate is allowed even when premium_estimation.estimated is null. "
+            "Return JSON only. Set hitl_required=true. "
+            "Reason must explicitly say estimate is indicative only and requires underwriter review."
         ),
     }
 
@@ -222,6 +301,14 @@ def generate_underwriting_explanation(policy_data, product_prediction, premium_e
                 "content": [{"type": "input_text", "text": json.dumps(prompt, ensure_ascii=False)}],
             }
         ],
+        "text": {
+            "format": {
+                "type": "json_schema",
+                "name": "llm_estimation",
+                "schema": schema,
+                "strict": True,
+            }
+        },
     }
 
     req = request.Request(
@@ -235,28 +322,34 @@ def generate_underwriting_explanation(policy_data, product_prediction, premium_e
     )
 
     try:
-        with request.urlopen(req, timeout=15) as response:
+        with request.urlopen(req, timeout=20) as response:
             parsed = json.loads(response.read().decode("utf-8"))
             content = parsed.get("output_text")
             if not content:
-                content = "LLM nie zwrócił output_text; użyj manualnej oceny ryzyka."
-            return {
-                "provider": "openai",
-                "model": model_name,
-                "content": content,
-            }
-    except error.HTTPError as exc:
-        return {
-            "provider": "openai",
-            "model": model_name,
-            "content": f"Błąd HTTP z API LLM: {exc.code}. Użyj manualnej oceny.",
-        }
-    except error.URLError as exc:
-        return {
-            "provider": "openai",
-            "model": model_name,
-            "content": f"Błąd połączenia z API LLM: {exc.reason}. Użyj manualnej oceny.",
-        }
+                return _fallback_llm_estimation(
+                    "OpenAI returned empty structured payload; indicative fallback prepared for HITL only.",
+                    premium_estimation,
+                )
+
+            llm_data = json.loads(content)
+            llm_data["hitl_required"] = True
+            if llm_data.get("status") not in ["enabled", "fallback"]:
+                llm_data["status"] = "enabled"
+
+            return LLMEstimation.model_validate(llm_data)
+    except (json.JSONDecodeError, ValueError):
+        return _fallback_llm_estimation(
+            "Invalid OpenAI JSON payload; indicative fallback prepared for HITL only.",
+            premium_estimation,
+        )
+    except error.HTTPError:
+        return _error_llm_estimation(
+            "LLM service unavailable; unable to produce indicative estimate right now."
+        )
+    except error.URLError:
+        return _error_llm_estimation(
+            "Network error while contacting LLM service; try again later."
+        )
 
 
 @app.get("/")
@@ -284,9 +377,9 @@ def underwrite(policy: PolicyInput):
     data = policy.model_dump()
     product_prediction = predict_product(data)
     premium_estimation = estimate(data)
-    llm_explanation = generate_underwriting_explanation(data, product_prediction, premium_estimation)
+    llm_estimation = generate_llm_estimation(data, product_prediction, premium_estimation)
     return {
         "product_prediction": product_prediction,
         "premium_estimation": premium_estimation,
-        "llm_explanation": llm_explanation,
+        "llm_estimation": llm_estimation,
     }
