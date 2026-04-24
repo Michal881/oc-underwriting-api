@@ -31,17 +31,18 @@ Przykładowy kształt odpowiedzi:
 
 ## Zachowanie LLM
 
-- Jeśli `OPENAI_API_KEY` jest ustawiony, backend wywołuje OpenAI Responses API (domyślnie `gpt-4.1-mini`) i najpierw próbuje odczytać structured output, a następnie `output_text`/ekstrakcję JSON jako fallback parser.
-- LLM może zwrócić wskazanie składki nawet wtedy, gdy `premium_estimation.estimated` jest `null`.
-- Backend loguje bezpieczne diagnostyki: model, informację czy klucz API jest obecny oraz czy `output_text` jest puste (bez logowania sekretów).
+- Jeśli `OPENAI_API_KEY` jest ustawiony, backend wywołuje OpenAI Python SDK (`client.beta.chat.completions.parse`) i wymusza odpowiedź zgodną z modelem Pydantic `LlmEstimationOutput`.
+- Parsing odbywa się wyłącznie przez structured output SDK (brak primary path opartego o `output_text` i brak ręcznego parsowania free-form JSON).
+- `llm_estimation.status="ok"` jest zwracane wyłącznie wtedy, gdy OpenAI zwróci poprawnie sparsowany obiekt Pydantic.
+- `premium_estimation` pozostaje deterministycznym źródłem ML/reguł i nie jest podmieniane/fabrykowane przez `llm_estimation`.
 - Gdy `OPENAI_API_KEY` nie jest skonfigurowany:
   - `status=disabled`,
   - wszystkie pola kwotowe ustawione na `null`,
   - `reason="OPENAI_API_KEY not configured"`,
   - `hitl_required=true`.
-- Gdy wywołanie OpenAI kończy się błędem HTTP/sieci:
+- Gdy wywołanie OpenAI lub structured parsing kończy się błędem:
   - `status=error`,
-  - bezpieczny komunikat błędu,
+  - bezpieczny komunikat błędu (bez fallbackowych/fikcyjnych wartości składki),
   - `hitl_required=true`.
 
 ## Uruchomienie
