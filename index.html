@@ -1,280 +1,695 @@
 <!DOCTYPE html>
-<html lang="pl">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>OC Underwriting Engine</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OC Underwriting MVP UI</title>
   <style>
-    body { margin:0; font-family:Arial, sans-serif; background:#f4f6f8; color:#1f2937; }
-    .container { max-width:900px; margin:40px auto; padding:24px; }
-    .card { background:white; border-radius:18px; padding:28px; box-shadow:0 10px 30px rgba(0,0,0,.08); margin-bottom:20px; }
-    h1 { margin-top:0; }
-    .subtitle, .footer { color:#6b7280; }
-    label { font-weight:600; margin-top:14px; display:block; }
-    input, textarea, select { width:100%; box-sizing:border-box; padding:12px; margin-top:6px; border:1px solid #d1d5db; border-radius:10px; font-size:15px; }
-    textarea { min-height:85px; }
-    .grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
-    button { margin-top:24px; width:100%; padding:14px; border:none; border-radius:12px; background:#111827; color:white; font-size:16px; font-weight:700; cursor:pointer; }
-    button:hover { background:#374151; }
-    pre { background:#111827; color:#d1fae5; padding:18px; border-radius:14px; overflow-x:auto; }
-    .badge { display:inline-block; padding:6px 10px; border-radius:999px; background:#e5e7eb; margin:0 8px 8px 0; font-size:13px; }
-    .warning { margin-top:8px; color:#92400e; background:#fef3c7; border:1px solid #fcd34d; border-radius:10px; padding:10px; font-size:14px; }
-    .metric { margin:6px 0; }
-    .llm-box { margin-top:14px; padding:14px; border:1px solid #d1d5db; border-radius:12px; background:#f9fafb; }
-    .llm-title { margin:0 0 8px 0; font-size:18px; }
-    .llm-explanation { margin:0 0 12px 0; padding:14px 16px; border-left:5px solid #2563eb; background:#dbeafe; border-radius:10px; font-size:15px; line-height:1.5; }
-    .llm-explainer-title { margin:0 0 6px 0; font-size:13px; text-transform:uppercase; color:#1d4ed8; letter-spacing:.05em; font-weight:700; }
+    :root {
+      --bg: #f3f6fb;
+      --panel: #ffffff;
+      --text: #0f172a;
+      --muted: #475569;
+      --border: #dbe3ef;
+      --primary: #1d4ed8;
+      --primary-dark: #1e40af;
+      --danger-bg: #fef2f2;
+      --danger-text: #991b1b;
+      --warning-bg: #fffbeb;
+      --warning-text: #92400e;
+      --ok-bg: #ecfdf5;
+      --ok-text: #065f46;
+      --shadow: 0 12px 35px rgba(15, 23, 42, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.45;
+    }
+
+    .container {
+      max-width: 1150px;
+      margin: 28px auto 56px;
+      padding: 0 18px;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 22px;
+      box-shadow: var(--shadow);
+      margin-bottom: 18px;
+    }
+
+    h1, h2, h3, h4 { margin: 0 0 12px; }
+
+    .subtle {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .banner {
+      border-radius: 12px;
+      padding: 12px 14px;
+      margin: 14px 0;
+      border: 1px solid transparent;
+      font-weight: 600;
+    }
+
+    .banner.warning {
+      background: var(--warning-bg);
+      color: var(--warning-text);
+      border-color: #fcd34d;
+    }
+
+    .banner.danger {
+      background: var(--danger-bg);
+      color: var(--danger-text);
+      border-color: #fecaca;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .field { margin-bottom: 12px; }
+
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 0.9rem;
+      font-weight: 650;
+      color: #1e293b;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      padding: 11px 12px;
+      font-size: 0.95rem;
+      color: #0f172a;
+      background: #fff;
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 78px;
+    }
+
+    .checkbox-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px 14px;
+      margin-top: 6px;
+    }
+
+    .checkbox-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.9rem;
+      color: #334155;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 8px 10px;
+      background: #f8fafc;
+    }
+
+    .checkbox-item input {
+      width: auto;
+      margin: 0;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 14px;
+    }
+
+    button {
+      border: none;
+      border-radius: 10px;
+      padding: 11px 16px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: 0.15s ease;
+    }
+
+    button.primary {
+      background: var(--primary);
+      color: #fff;
+    }
+
+    button.primary:hover { background: var(--primary-dark); }
+
+    button.secondary {
+      background: #e2e8f0;
+      color: #0f172a;
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .result-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .result-card {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      background: #ffffff;
+      min-height: 155px;
+    }
+
+    .result-card h4 {
+      margin-bottom: 8px;
+      font-size: 0.95rem;
+      color: #1e3a8a;
+    }
+
+    .metric { margin: 6px 0; font-size: 0.92rem; }
+
+    .status {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 3px 9px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .status.ok { background: var(--ok-bg); color: var(--ok-text); }
+    .status.fallback, .status.error, .status.disabled {
+      background: var(--danger-bg);
+      color: var(--danger-text);
+    }
+
+    .muted { color: var(--muted); }
+
+    .inline-note {
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    .raw-json {
+      margin-top: 12px;
+      border: 1px solid #dbe3ef;
+      border-radius: 10px;
+      overflow: hidden;
+      background: #0b1220;
+    }
+
+    details summary {
+      cursor: pointer;
+      padding: 10px 12px;
+      background: #dbeafe;
+      color: #1e3a8a;
+      font-weight: 700;
+      list-style: none;
+    }
+
+    details summary::-webkit-details-marker { display: none; }
+
+    pre {
+      margin: 0;
+      color: #d1fae5;
+      padding: 12px;
+      font-size: 0.84rem;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .loading {
+      font-weight: 700;
+      color: #1e40af;
+      margin-top: 8px;
+    }
+
+    @media (max-width: 980px) {
+      .grid, .grid-3, .result-grid, .checkbox-grid { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
-<div class="container">
-  <div class="card">
-    <h1>OC Underwriting Engine</h1>
-    <p class="subtitle">Bezpieczne scenariusze testowe — bez nazw ubezpieczonych i danych klientów.</p>
+  <main class="container">
+    <section class="panel">
+      <h1>OC Underwriting MVP</h1>
+      <p class="subtle">Static demo UI for a human-in-the-loop underwriting assistant using synthetic scenarios only.</p>
+      <div class="banner warning">This tool provides indicative support only. It must not be treated as a final underwriting decision.</div>
 
-    <label>Scenariusz</label>
-    <select id="scenario" onchange="loadScenario()">
-      <option value="law">Kancelaria / usługi prawne</option>
-      <option value="architect">Architekt / projektant</option>
-      <option value="product">Producent / OC za produkt</option>
-      <option value="property">Zarządzanie nieruchomością</option>
-      <option value="large">Duże ryzyko korporacyjne</option>
-      <option value="rate">Wycena ze stawki i obrotu</option>
-    </select>
-
-    <label>Produkt OC</label>
-    <select id="product_family">
-      <option value="">Nie podano — system spróbuje rozpoznać</option>
-      <option value="oc_zawodowe">OC zawodowe</option>
-      <option value="oc_ogolne">OC ogólne</option>
-      <option value="oc_produkt_lub_mieszane">OC produkt / mieszane</option>
-    </select>
-
-    <label>Opis działalności</label>
-    <textarea id="activity"></textarea>
-
-    <label>Zakres ubezpieczenia</label>
-    <textarea id="scope"></textarea>
-
-    <div class="grid">
-      <div>
-        <label>Suma gwarancyjna</label>
-        <input id="sum" type="number" />
+      <div class="field">
+        <label for="scenario">Scenario template</label>
+        <select id="scenario"></select>
       </div>
-      <div>
-        <label>Składka referencyjna / znana</label>
-        <input id="premium" type="number" />
+
+      <div class="grid">
+        <div class="field">
+          <label for="product_family">product_family</label>
+          <select id="product_family">
+            <option value="">(empty / auto-detect)</option>
+            <option value="oc_ogolne">oc_ogolne</option>
+            <option value="oc_zawodowe">oc_zawodowe</option>
+            <option value="oc_produkt_lub_mieszane">oc_produkt_lub_mieszane</option>
+            <option value="nieustalone">nieustalone</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="insured_products">insured_products</label>
+          <input id="insured_products" type="text" />
+        </div>
       </div>
-    </div>
 
-    <div class="grid">
-      <div>
-        <label>Obrót</label>
-        <input id="turnover" type="number" />
+      <div class="field">
+        <label for="insured_activity">insured_activity</label>
+        <textarea id="insured_activity"></textarea>
       </div>
-      <div>
-        <label>Stawka ‰</label>
-        <input id="rate" type="number" step="0.01" />
+
+      <div class="field">
+        <label for="scope_of_insurance">scope_of_insurance</label>
+        <textarea id="scope_of_insurance"></textarea>
       </div>
-    </div>
 
-    <div class="grid">
-      <div>
-        <label>Franszyza redukcyjna / deductible_amount</label>
-        <input id="deductible_amount" type="number" />
+      <div class="grid-3">
+        <div class="field">
+          <label for="sum_guaranteed_amount">sum_guaranteed_amount</label>
+          <input id="sum_guaranteed_amount" type="number" min="0" step="1" />
+        </div>
+        <div class="field">
+          <label for="turnover_amount">turnover_amount</label>
+          <input id="turnover_amount" type="number" min="0" step="1" />
+        </div>
+        <div class="field">
+          <label for="rate_primary_per_mille">rate_primary_per_mille</label>
+          <input id="rate_primary_per_mille" type="number" min="0" step="0.01" />
+        </div>
       </div>
-      <div></div>
-    </div>
 
-    <button onclick="sendRequest()">Uruchom underwriting</button>
-  </div>
+      <div class="grid-3">
+        <div class="field">
+          <label for="premium_amount">premium_amount</label>
+          <input id="premium_amount" type="number" min="0" step="1" />
+        </div>
+        <div class="field">
+          <label for="deductible_amount">deductible_amount</label>
+          <input id="deductible_amount" type="number" min="0" step="1" />
+        </div>
+        <div class="field">
+          <label for="usa_canada_included">usa_canada_included</label>
+          <select id="usa_canada_included">
+            <option value="false">false</option>
+            <option value="true">true</option>
+          </select>
+        </div>
+      </div>
 
-  <div class="card">
-    <h2>Wynik</h2>
-    <div id="summary"></div>
-    <div id="estimates"></div>
-    <div id="llm_estimation" class="llm-box" style="display:none;"></div>
-    <div id="warning" class="warning" style="display:none;">LLM estimate is indicative only and requires underwriter review.</div>
-    <pre id="result">Wybierz scenariusz i kliknij „Uruchom underwriting”.</pre>
-  </div>
+      <div class="field">
+        <label>Cover flags</label>
+        <div class="checkbox-grid">
+          <label class="checkbox-item"><input id="covers_general_liability" type="checkbox" /> covers_general_liability</label>
+          <label class="checkbox-item"><input id="covers_professional_liability" type="checkbox" /> covers_professional_liability</label>
+          <label class="checkbox-item"><input id="covers_product_liability" type="checkbox" /> covers_product_liability</label>
+          <label class="checkbox-item"><input id="covers_completed_operations" type="checkbox" /> covers_completed_operations</label>
+          <label class="checkbox-item"><input id="covers_pure_financial_loss" type="checkbox" /> covers_pure_financial_loss</label>
+          <label class="checkbox-item"><input id="covers_employers_liability" type="checkbox" /> covers_employers_liability</label>
+          <label class="checkbox-item"><input id="covers_documents_loss" type="checkbox" /> covers_documents_loss</label>
+          <label class="checkbox-item"><input id="covers_subcontractors" type="checkbox" /> covers_subcontractors</label>
+        </div>
+        <p class="inline-note">All values are editable after loading a scenario.</p>
+      </div>
 
-  <p class="footer">MVP demonstracyjny — nie stanowi decyzji underwritingowej.</p>
-</div>
+      <div class="actions">
+        <button id="submitBtn" class="primary" type="button">Run /underwrite</button>
+        <button id="reloadScenarioBtn" class="secondary" type="button">Reload selected scenario</button>
+      </div>
+      <p id="loading" class="loading" hidden>Submitting request and waiting for response...</p>
+      <div id="errorBox" class="banner danger" hidden></div>
+    </section>
 
-<script>
-const API_URL = "https://oc-underwriting-api.onrender.com/underwrite";
+    <section class="panel">
+      <h2>Results</h2>
+      <div class="banner warning">LLM estimate is indicative only and requires underwriter review.</div>
 
-const scenarios = {
-  law: {
-    product_family: "oc_zawodowe",
-    activity: "świadczenie pomocy prawnej i doradztwa podatkowego",
-    scope: "odpowiedzialność cywilna zawodowa za szkody wynikające z wykonywania usług prawnych",
-    sum: 5000000,
-    premium: 30000,
-    turnover: "",
-    rate: "",
-    deductible_amount: 5000
-  },
-  architect: {
-    product_family: "oc_zawodowe",
-    activity: "usługi architektoniczne, projektowanie budynków, nadzór autorski",
-    scope: "odpowiedzialność cywilna zawodowa projektanta i architekta",
-    sum: 1000000,
-    premium: 12000,
-    turnover: "",
-    rate: "",
-    deductible_amount: 10000
-  },
-  product: {
-    product_family: "oc_produkt_lub_mieszane",
-    activity: "produkcja i sprzedaż wyrobów przemysłowych",
-    scope: "OC ogólna z włączeniem odpowiedzialności za produkt i wykonane usługi",
-    sum: 10000000,
-    premium: 120960,
-    turnover: "",
-    rate: "",
-    deductible_amount: 15000
-  },
-  property: {
-    product_family: "oc_ogolne",
-    activity: "posiadanie i zarządzanie nieruchomością komercyjną",
-    scope: "OC ogólna z tytułu posiadania mienia i prowadzonej działalności",
-    sum: 3000000,
-    premium: 9100,
-    turnover: "",
-    rate: "",
-    deductible_amount: 3000
-  },
-  large: {
-    product_family: "oc_ogolne",
-    activity: "duża działalność produkcyjna i dystrybucyjna o zasięgu międzynarodowym",
-    scope: "OC ogólna, produktowa, wykonane usługi, szeroki zakres terytorialny",
-    sum: 30000000,
-    premium: 500000,
-    turnover: "",
-    rate: "",
-    deductible_amount: 50000
-  },
-  rate: {
-    product_family: "oc_ogolne",
-    activity: "prowadzenie działalności gospodarczej o znanym obrocie",
-    scope: "OC ogólna liczona od obrotu i stawki",
-    sum: 5000000,
-    premium: "",
-    turnover: 20000000,
-    rate: 0.75,
-    deductible_amount: 10000
-  }
-};
+      <div class="result-grid">
+        <article class="result-card">
+          <h4>Product prediction</h4>
+          <div id="productResult" class="muted">No result yet.</div>
+        </article>
 
-function loadScenario() {
-  const s = scenarios[document.getElementById("scenario").value];
+        <article class="result-card">
+          <h4>ML/rules premium estimation</h4>
+          <div id="premiumResult" class="muted">No result yet.</div>
+        </article>
 
-  document.getElementById("product_family").value = s.product_family;
-  document.getElementById("activity").value = s.activity;
-  document.getElementById("scope").value = s.scope;
-  document.getElementById("sum").value = s.sum;
-  document.getElementById("premium").value = s.premium;
-  document.getElementById("turnover").value = s.turnover;
-  document.getElementById("rate").value = s.rate;
-  document.getElementById("deductible_amount").value = s.deductible_amount;
+        <article class="result-card">
+          <h4>LLM indicative estimation</h4>
+          <div id="llmResult" class="muted">No result yet.</div>
+        </article>
+      </div>
 
-  document.getElementById("summary").innerHTML = "";
-  document.getElementById("estimates").innerHTML = "";
-  document.getElementById("llm_estimation").style.display = "none";
-  document.getElementById("llm_estimation").innerHTML = "";
-  document.getElementById("warning").style.display = "none";
-  document.getElementById("result").textContent = "Kliknij „Uruchom underwriting”.";
-}
+      <details class="raw-json">
+        <summary>Raw JSON response</summary>
+        <pre id="jsonResult">{}</pre>
+      </details>
+    </section>
+  </main>
 
-function formatAmount(value) {
-  if (value === null || value === undefined) return "brak";
-  return new Intl.NumberFormat("pl-PL", { maximumFractionDigits: 2 }).format(value);
-}
+  <script>
+    const API_URL = "https://oc-underwriting-api.onrender.com/underwrite";
 
-async function sendRequest() {
-  const premiumValue = document.getElementById("premium").value;
-  const turnoverValue = document.getElementById("turnover").value;
-  const rateValue = document.getElementById("rate").value;
-  const deductibleValue = document.getElementById("deductible_amount").value;
+    const SCENARIOS = {
+      restaurant: {
+        label: "restaurant / catering",
+        data: {
+          product_family: "oc_ogolne",
+          insured_activity: "Operation of a mid-size restaurant and event catering service using synthetic data.",
+          scope_of_insurance: "General liability for daily operations, guest incidents, and catering services.",
+          insured_products: "Prepared meals, packaged takeaway products, non-alcoholic beverages.",
+          sum_guaranteed_amount: 2000000,
+          turnover_amount: 4500000,
+          rate_primary_per_mille: 1.4,
+          premium_amount: 6300,
+          deductible_amount: 2500,
+          usa_canada_included: false,
+          covers_general_liability: 1,
+          covers_professional_liability: 0,
+          covers_product_liability: 1,
+          covers_completed_operations: 1,
+          covers_pure_financial_loss: 0,
+          covers_employers_liability: 1,
+          covers_documents_loss: 0,
+          covers_subcontractors: 0
+        }
+      },
+      property_management: {
+        label: "property management",
+        data: {
+          product_family: "oc_ogolne",
+          insured_activity: "Management of synthetic residential and mixed-use properties.",
+          scope_of_insurance: "General liability tied to property possession, tenant areas, and maintenance coordination.",
+          insured_products: "Property management services only.",
+          sum_guaranteed_amount: 3000000,
+          turnover_amount: 6000000,
+          rate_primary_per_mille: 1.1,
+          premium_amount: 6600,
+          deductible_amount: 3000,
+          usa_canada_included: false,
+          covers_general_liability: 1,
+          covers_professional_liability: 0,
+          covers_product_liability: 0,
+          covers_completed_operations: 0,
+          covers_pure_financial_loss: 0,
+          covers_employers_liability: 1,
+          covers_documents_loss: 0,
+          covers_subcontractors: 1
+        }
+      },
+      accounting_office: {
+        label: "accounting office",
+        data: {
+          product_family: "oc_zawodowe",
+          insured_activity: "Bookkeeping and payroll advisory provided by a synthetic accounting office.",
+          scope_of_insurance: "Professional liability for accounting errors and advisory omissions.",
+          insured_products: "Accounting, payroll and tax filing support services.",
+          sum_guaranteed_amount: 1500000,
+          turnover_amount: 2200000,
+          rate_primary_per_mille: 2.0,
+          premium_amount: 4400,
+          deductible_amount: 5000,
+          usa_canada_included: false,
+          covers_general_liability: 1,
+          covers_professional_liability: 1,
+          covers_product_liability: 0,
+          covers_completed_operations: 0,
+          covers_pure_financial_loss: 1,
+          covers_employers_liability: 0,
+          covers_documents_loss: 1,
+          covers_subcontractors: 0
+        }
+      },
+      construction_contractor: {
+        label: "construction contractor",
+        data: {
+          product_family: "oc_ogolne",
+          insured_activity: "Synthetic contractor executing renovation and fit-out works.",
+          scope_of_insurance: "General liability including completed operations and subcontracted works.",
+          insured_products: "Renovation, fit-out, and installation services.",
+          sum_guaranteed_amount: 5000000,
+          turnover_amount: 12000000,
+          rate_primary_per_mille: 2.4,
+          premium_amount: 28800,
+          deductible_amount: 10000,
+          usa_canada_included: false,
+          covers_general_liability: 1,
+          covers_professional_liability: 0,
+          covers_product_liability: 0,
+          covers_completed_operations: 1,
+          covers_pure_financial_loss: 0,
+          covers_employers_liability: 1,
+          covers_documents_loss: 0,
+          covers_subcontractors: 1
+        }
+      },
+      product_manufacturer: {
+        label: "product liability manufacturer",
+        data: {
+          product_family: "oc_produkt_lub_mieszane",
+          insured_activity: "Synthetic manufacturer of household electrical accessories.",
+          scope_of_insurance: "General and product liability for manufactured and distributed goods.",
+          insured_products: "Adapters, power strips, and low-voltage electronic accessories.",
+          sum_guaranteed_amount: 10000000,
+          turnover_amount: 25000000,
+          rate_primary_per_mille: 3.0,
+          premium_amount: 75000,
+          deductible_amount: 20000,
+          usa_canada_included: false,
+          covers_general_liability: 1,
+          covers_professional_liability: 0,
+          covers_product_liability: 1,
+          covers_completed_operations: 1,
+          covers_pure_financial_loss: 0,
+          covers_employers_liability: 1,
+          covers_documents_loss: 0,
+          covers_subcontractors: 1
+        }
+      }
+    };
 
-  const scenario = document.getElementById("scenario").value;
+    const textFields = [
+      "product_family", "insured_activity", "scope_of_insurance", "insured_products", "usa_canada_included"
+    ];
 
-  const data = {
-    product_family: document.getElementById("product_family").value || null,
-    insured_activity: document.getElementById("activity").value,
-    scope_of_insurance: document.getElementById("scope").value,
-    sum_guaranteed_amount: Number(document.getElementById("sum").value),
-    premium_amount: premiumValue ? Number(premiumValue) : null,
-    turnover_amount: turnoverValue ? Number(turnoverValue) : null,
-    rate_primary_per_mille: rateValue ? Number(rateValue) : null,
-    deductible_amount: deductibleValue ? Number(deductibleValue) : null,
+    const numericFields = [
+      "sum_guaranteed_amount", "turnover_amount", "rate_primary_per_mille", "premium_amount", "deductible_amount"
+    ];
 
-    covers_general_liability: 1,
-    covers_professional_liability: scenario === "law" || scenario === "architect" ? 1 : 0,
-    covers_product_liability: scenario === "product" || scenario === "large" ? 1 : 0,
-    covers_completed_operations: scenario === "product" || scenario === "large" ? 1 : 0,
-    covers_pure_financial_loss: scenario === "law" ? 1 : 0,
-    covers_employers_liability: 0,
-    covers_documents_loss: scenario === "law" ? 1 : 0,
-    covers_subcontractors: scenario === "architect" ? 1 : 0
-  };
+    const coverFields = [
+      "covers_general_liability", "covers_professional_liability", "covers_product_liability",
+      "covers_completed_operations", "covers_pure_financial_loss", "covers_employers_liability",
+      "covers_documents_loss", "covers_subcontractors"
+    ];
 
-  document.getElementById("summary").innerHTML = "";
-  document.getElementById("estimates").innerHTML = "";
-  document.getElementById("llm_estimation").style.display = "none";
-  document.getElementById("llm_estimation").innerHTML = "";
-  document.getElementById("warning").style.display = "none";
-  document.getElementById("result").textContent = "Przetwarzanie...";
-
-  try {
-    const response = await fetch(API_URL, {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify(data)
-    });
-
-    if (!response.ok) {
-      throw new Error("API zwróciło błąd HTTP: " + response.status);
+    function fmtAmount(value) {
+      if (value === null || value === undefined || value === "") {
+        return "—";
+      }
+      const n = Number(value);
+      if (Number.isNaN(n)) {
+        return String(value);
+      }
+      return new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(n);
     }
 
-    const result = await response.json();
-    const llm = result.llm_estimation || {};
+    function setScenarioOptions() {
+      const scenarioEl = document.getElementById("scenario");
+      scenarioEl.innerHTML = "";
+      Object.entries(SCENARIOS).forEach(([key, val]) => {
+        const opt = document.createElement("option");
+        opt.value = key;
+        opt.textContent = val.label;
+        scenarioEl.appendChild(opt);
+      });
+    }
 
-    document.getElementById("summary").innerHTML = `
-      <span class="badge">Produkt: ${result.product_prediction.product_family}</span>
-      <span class="badge">Confidence produktu: ${result.product_prediction.confidence}</span>
-      <span class="badge">Metoda ML/reguły: ${result.premium_estimation.method}</span>
-    `;
+    function loadScenario() {
+      const key = document.getElementById("scenario").value;
+      const scenario = SCENARIOS[key];
+      if (!scenario) return;
 
-    document.getElementById("estimates").innerHTML = `
-      <p class="metric"><strong>ML/rules estimate:</strong> ${formatAmount(result.premium_estimation.estimated)}</p>
-      <p class="metric"><strong>LLM status:</strong> ${llm.status || "brak"}</p>
-    `;
-    document.getElementById("llm_estimation").style.display = "block";
-    document.getElementById("llm_estimation").innerHTML = `
-      <h3 class="llm-title">LLM Estimation (HITL)</h3>
-      <div class="llm-explanation">
-        <p class="llm-explainer-title">LLM explanation</p>
-        <strong>${llm.explanation || "brak"}</strong>
-      </div>
-      <p class="metric"><strong>Indicative estimate:</strong> ${formatAmount(llm.estimated_premium)}</p>
-      <p class="metric"><strong>Premium range:</strong> ${formatAmount(llm.premium_range_low)} - ${formatAmount(llm.premium_range_high)}</p>
-      <p class="metric"><strong>Confidence:</strong> ${llm.confidence || "brak"}</p>
-      <p class="metric"><strong>Missing data:</strong> ${(llm.missing_data || []).join(", ") || "brak"}</p>
-      <p class="metric"><strong>Reason:</strong> ${llm.reason || "brak"}</p>
-      <p class="metric"><strong>HITL required:</strong> ${llm.hitl_required === true ? "tak" : "nie"}</p>
-    `;
+      const payload = scenario.data;
 
-    document.getElementById("warning").style.display = "block";
-    document.getElementById("result").textContent = JSON.stringify(result, null, 2);
+      textFields.forEach((field) => {
+        const el = document.getElementById(field);
+        if (field === "usa_canada_included") {
+          el.value = String(Boolean(payload[field]));
+        } else {
+          el.value = payload[field] ?? "";
+        }
+      });
 
-  } catch (error) {
-    document.getElementById("result").textContent =
-      "Błąd połączenia z API:\n" + error.message;
-  }
-}
+      numericFields.forEach((field) => {
+        document.getElementById(field).value = payload[field] ?? "";
+      });
 
-loadScenario();
-</script>
+      coverFields.forEach((field) => {
+        document.getElementById(field).checked = Number(payload[field]) === 1;
+      });
+
+      clearStatusAndResults();
+    }
+
+    function clearStatusAndResults() {
+      document.getElementById("errorBox").hidden = true;
+      document.getElementById("errorBox").textContent = "";
+      document.getElementById("loading").hidden = true;
+      document.getElementById("productResult").innerHTML = '<span class="muted">No result yet.</span>';
+      document.getElementById("premiumResult").innerHTML = '<span class="muted">No result yet.</span>';
+      document.getElementById("llmResult").innerHTML = '<span class="muted">No result yet.</span>';
+      document.getElementById("jsonResult").textContent = "{}";
+    }
+
+    function collectPayload() {
+      const payload = {};
+
+      payload.product_family = document.getElementById("product_family").value || null;
+      payload.insured_activity = document.getElementById("insured_activity").value || null;
+      payload.scope_of_insurance = document.getElementById("scope_of_insurance").value || null;
+      payload.insured_products = document.getElementById("insured_products").value || null;
+
+      numericFields.forEach((field) => {
+        const rawValue = document.getElementById(field).value;
+        payload[field] = rawValue === "" ? null : Number(rawValue);
+      });
+
+      payload.usa_canada_included = document.getElementById("usa_canada_included").value === "true";
+
+      coverFields.forEach((field) => {
+        payload[field] = document.getElementById(field).checked ? 1 : 0;
+      });
+
+      return payload;
+    }
+
+    function renderProductCard(product) {
+      if (!product) {
+        return '<span class="muted">No product prediction in response.</span>';
+      }
+
+      return `
+        <div class="metric"><strong>product_family:</strong> ${product.product_family ?? "—"}</div>
+        <div class="metric"><strong>confidence:</strong> ${product.confidence ?? "—"}</div>
+        <div class="metric"><strong>reason:</strong> ${product.reason ?? "—"}</div>
+      `;
+    }
+
+    function renderPremiumCard(premium) {
+      if (!premium) {
+        return '<span class="muted">No premium estimation in response.</span>';
+      }
+
+      return `
+        <div class="metric"><strong>method:</strong> ${premium.method ?? "—"}</div>
+        <div class="metric"><strong>estimated:</strong> ${fmtAmount(premium.estimated)}</div>
+        <div class="metric"><strong>reason:</strong> ${premium.reason ?? "—"}</div>
+      `;
+    }
+
+    function renderLlmCard(llm) {
+      if (!llm) {
+        return '<span class="muted">No llm_estimation in response.</span>';
+      }
+
+      const statusClass = String(llm.status || "fallback").toLowerCase();
+      const missingData = Array.isArray(llm.missing_data) && llm.missing_data.length
+        ? llm.missing_data.join(", ")
+        : "none";
+
+      return `
+        <div class="status ${statusClass}">${llm.status ?? "unknown"}</div>
+        <div class="metric"><strong>estimated_premium:</strong> ${fmtAmount(llm.estimated_premium)}</div>
+        <div class="metric"><strong>premium_range_low:</strong> ${fmtAmount(llm.premium_range_low)}</div>
+        <div class="metric"><strong>premium_range_high:</strong> ${fmtAmount(llm.premium_range_high)}</div>
+        <div class="metric"><strong>confidence:</strong> ${llm.confidence ?? "—"}</div>
+        <div class="metric"><strong>reason:</strong> ${llm.reason ?? "—"}</div>
+        <div class="metric"><strong>explanation:</strong> ${llm.explanation ?? "—"}</div>
+        <div class="metric"><strong>missing_data:</strong> ${missingData}</div>
+        <div class="metric"><strong>HITL warning:</strong> ${llm.hitl_required ? "Underwriter review required" : "No"}</div>
+      `;
+    }
+
+    async function submitUnderwrite() {
+      const payload = collectPayload();
+      const submitBtn = document.getElementById("submitBtn");
+      const loadingEl = document.getElementById("loading");
+      const errorEl = document.getElementById("errorBox");
+
+      submitBtn.disabled = true;
+      loadingEl.hidden = false;
+      errorEl.hidden = true;
+      errorEl.textContent = "";
+
+      try {
+        const response = await fetch(API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        const responseText = await response.text();
+        let data;
+        try {
+          data = JSON.parse(responseText);
+        } catch {
+          throw new Error("API returned non-JSON response.");
+        }
+
+        if (!response.ok) {
+          const detail = data && data.detail ? ` | detail: ${JSON.stringify(data.detail)}` : "";
+          throw new Error(`HTTP ${response.status}${detail}`);
+        }
+
+        document.getElementById("productResult").innerHTML = renderProductCard(data.product_prediction);
+        document.getElementById("premiumResult").innerHTML = renderPremiumCard(data.premium_estimation);
+        document.getElementById("llmResult").innerHTML = renderLlmCard(data.llm_estimation);
+        document.getElementById("jsonResult").textContent = JSON.stringify(data, null, 2);
+      } catch (error) {
+        errorEl.hidden = false;
+        errorEl.textContent = `Request failed: ${error.message}`;
+      } finally {
+        loadingEl.hidden = true;
+        submitBtn.disabled = false;
+      }
+    }
+
+    document.getElementById("scenario").addEventListener("change", loadScenario);
+    document.getElementById("reloadScenarioBtn").addEventListener("click", loadScenario);
+    document.getElementById("submitBtn").addEventListener("click", submitUnderwrite);
+
+    setScenarioOptions();
+    loadScenario();
+  </script>
 </body>
 </html>
