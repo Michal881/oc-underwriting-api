@@ -76,3 +76,33 @@ Formularz zawiera też pole `deductible_amount` (franszyza redukcyjna).
 ## Bezpieczeństwo danych
 
 W demonstracji używaj wyłącznie **syntetycznych scenariuszy** i nie wprowadzaj realnych danych klientów.
+
+## Local static UI usage
+
+The demo frontend is a single static file (`index.html`) and does not require any build tools or frontend dependencies.
+
+### Option 1: open directly
+
+1. In your file browser, open `index.html` from this repository.
+2. The page calls the production endpoint directly:
+   - `POST https://oc-underwriting-api.onrender.com/underwrite`
+
+### Option 2: serve locally (recommended)
+
+From the repository root:
+
+```bash
+python -m http.server 8080
+```
+
+Then open:
+
+- `http://localhost:8080/index.html`
+
+### Demo and safety notes
+
+- Use only synthetic/anonymized examples in the UI.
+- Results are support signals only and **not** a final underwriting decision.
+- LLM output is indicative only and always requires human underwriter review (HITL).
+- Never expose backend secrets (for example `OPENAI_API_KEY`) in frontend code.
+
