@@ -28,6 +28,6 @@ echo "$RESPONSE" | python -c 'import json,sys
 obj=json.load(sys.stdin)
 assert "llm_estimation" in obj, "Missing llm_estimation"
 llm=obj["llm_estimation"]
-assert llm["status"] in {"ok","disabled","error","fallback"}, "Invalid llm_estimation.status"
+assert llm["status"] in {"ok","disabled","error"}, "Invalid llm_estimation.status"
 assert isinstance(llm.get("explanation"), str) and llm["explanation"].strip(), "Missing llm_estimation.explanation"
 print("smoke test passed")'

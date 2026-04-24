@@ -1,18 +1,15 @@
-import json
 import logging
 import os
-from json import JSONDecoder
 from typing import Literal, Optional
-from urllib import error, request
 
 import joblib
 import pandas as pd
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from openai import OpenAI
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
-LLM_LOG_TRUNCATE_CHARS = 1000
 
 
 bundle = joblib.load("premium_model.joblib")
@@ -61,7 +58,7 @@ class ProductInput(BaseModel):
 
 
 class LLMEstimation(BaseModel):
-    status: Literal["ok", "disabled", "error", "fallback"]
+    status: Literal["ok", "disabled", "error"]
     estimated_premium: Optional[float]
     premium_range_low: Optional[float]
     premium_range_high: Optional[float]
@@ -76,6 +73,17 @@ class UnderwriteResult(BaseModel):
     product_prediction: dict
     premium_estimation: dict
     llm_estimation: LLMEstimation
+
+
+class LlmEstimationOutput(BaseModel):
+    status: Literal["ok"]
+    estimated_premium: float
+    premium_range_low: float
+    premium_range_high: float
+    confidence: Literal["low", "medium", "high"]
+    reason: str
+    missing_data: list[str] = Field(default_factory=list)
+    hitl_required: Literal[True]
 
 
 def classify_premium(row):
@@ -216,164 +224,21 @@ def _error_llm_estimation(reason: str) -> LLMEstimation:
     )
 
 
-def _fallback_llm_estimation(reason: str, premium_estimation: dict) -> LLMEstimation:
-    base_estimate = premium_estimation.get("estimated")
-    if isinstance(base_estimate, (int, float)):
-        low = round(float(base_estimate) * 0.8, 2)
-        high = round(float(base_estimate) * 1.2, 2)
-    else:
-        low = None
-        high = None
-
-    source_method = premium_estimation.get("method")
-    if isinstance(base_estimate, (int, float)):
-        status = "ok"
-        if source_method in {"rate", "rate_minimum"}:
-            effective_reason = "Indicative estimate calculated from turnover × rate; HITL review required."
-        else:
-            effective_reason = "Indicative estimate calculated from deterministic fallback inputs; HITL review required."
-        explanation = (
-            "Data used: available underwriting input fields and deterministic premium fallback inputs "
-            f"(premium_estimation.method={source_method or 'unknown'}). "
-            "Value source: deterministic fallback, not direct LLM JSON output. "
-            "HITL review is required because this estimate is indicative/non-binding and must be validated by an underwriter."
-        )
-    else:
-        status = "fallback"
-        effective_reason = reason
-        explanation = (
-            "Data used: available underwriting inputs, but insufficient numeric fields were present to compute "
-            "a deterministic indicative premium. Value source: fallback path after LLM output issue/unavailability. "
-            "HITL review is required for any underwriting decision."
-        )
-
+def _disabled_llm_estimation(reason: str) -> LLMEstimation:
     return LLMEstimation(
-        status=status,
-        estimated_premium=float(base_estimate) if isinstance(base_estimate, (int, float)) else None,
-        premium_range_low=low,
-        premium_range_high=high,
+        status="disabled",
+        estimated_premium=None,
+        premium_range_low=None,
+        premium_range_high=None,
         confidence="low",
-        reason=effective_reason,
-        explanation=explanation,
+        reason=reason,
+        explanation=(
+            "LLM estimation is disabled because OPENAI_API_KEY is not configured. "
+            "HITL review is required for any underwriting decision."
+        ),
         missing_data=[],
         hitl_required=True,
     )
-
-
-def _extract_first_json_object(text: str) -> Optional[dict]:
-    candidate = (text or "").strip()
-    if not candidate:
-        return None
-
-    try:
-        obj = json.loads(candidate)
-        if isinstance(obj, dict):
-            return obj
-    except json.JSONDecodeError:
-        pass
-
-    decoder = JSONDecoder()
-    for index, char in enumerate(candidate):
-        if char != "{":
-            continue
-        try:
-            obj, _ = decoder.raw_decode(candidate[index:])
-            if isinstance(obj, dict):
-                return obj
-        except json.JSONDecodeError:
-            continue
-
-    return None
-
-
-def _truncate_for_log(value: str, max_chars: int = LLM_LOG_TRUNCATE_CHARS) -> str:
-    if len(value) <= max_chars:
-        return value
-    return f"{value[:max_chars]}...<truncated>"
-
-
-def _clean_llm_json_text(text: str) -> str:
-    candidate = (text or "").strip()
-    if not candidate:
-        return ""
-
-    if candidate.startswith("```"):
-        lines = candidate.splitlines()
-        if lines and lines[0].strip().startswith("```"):
-            lines = lines[1:]
-        if lines and lines[-1].strip() == "```":
-            lines = lines[:-1]
-        candidate = "\n".join(lines).strip()
-
-    first_brace = candidate.find("{")
-    last_brace = candidate.rfind("}")
-    if first_brace != -1 and last_brace != -1 and first_brace < last_brace:
-        candidate = candidate[first_brace : last_brace + 1]
-
-    return candidate.strip()
-
-
-def _extract_llm_data(parsed_response: dict) -> tuple[Optional[dict], str]:
-    if not isinstance(parsed_response, dict):
-        return None, ""
-
-    output_parsed = parsed_response.get("output_parsed")
-    if isinstance(output_parsed, dict):
-        return output_parsed, json.dumps(output_parsed, ensure_ascii=False)
-
-    for item in parsed_response.get("output", []):
-        if not isinstance(item, dict):
-            continue
-        for content in item.get("content", []):
-            if not isinstance(content, dict):
-                continue
-            if isinstance(content.get("parsed"), dict):
-                parsed_obj = content["parsed"]
-                return parsed_obj, json.dumps(parsed_obj, ensure_ascii=False)
-
-    if isinstance(parsed_response.get("output_text"), str):
-        text = parsed_response["output_text"]
-        cleaned = _clean_llm_json_text(text)
-        extracted = _extract_first_json_object(cleaned)
-        return extracted, cleaned
-
-    return None, ""
-
-
-def _is_effectively_empty_policy(policy_data: dict) -> bool:
-    fields_to_check = [
-        "product_family",
-        "insured_activity",
-        "scope_of_insurance",
-        "insured_products",
-        "sum_guaranteed_amount",
-        "turnover_amount",
-        "rate_primary_per_mille",
-        "premium_amount",
-        "deductible_amount",
-    ]
-    for key in fields_to_check:
-        value = policy_data.get(key)
-        if isinstance(value, str) and value.strip():
-            return False
-        if value not in (None, ""):
-            return False
-    return True
-
-
-def _heuristic_estimate(policy_data: dict, premium_estimation: dict) -> Optional[float]:
-    ml_or_rules = premium_estimation.get("estimated")
-    if isinstance(ml_or_rules, (int, float)):
-        return float(ml_or_rules)
-    if isinstance(policy_data.get("premium_amount"), (int, float)):
-        return float(policy_data["premium_amount"])
-    if isinstance(policy_data.get("turnover_amount"), (int, float)) and isinstance(
-        policy_data.get("rate_primary_per_mille"), (int, float)
-    ):
-        return float(policy_data["turnover_amount"]) * float(policy_data["rate_primary_per_mille"]) / 1000
-    if isinstance(policy_data.get("sum_guaranteed_amount"), (int, float)):
-        return float(policy_data["sum_guaranteed_amount"]) * 0.003
-    return None
 
 
 def generate_llm_estimation(policy_data, product_prediction, premium_estimation) -> LLMEstimation:
@@ -385,122 +250,64 @@ def generate_llm_estimation(policy_data, product_prediction, premium_estimation)
         model_name,
     )
     if not api_key:
-        return _fallback_llm_estimation("OPENAI_API_KEY not configured", premium_estimation)
-
-    prompt = {
-        "policy": {
-            "product_family": policy_data.get("product_family"),
-            "insured_activity": policy_data.get("insured_activity"),
-            "scope_of_insurance": policy_data.get("scope_of_insurance"),
-            "sum_guaranteed_amount": policy_data.get("sum_guaranteed_amount"),
-            "premium_amount": policy_data.get("premium_amount"),
-            "turnover_amount": policy_data.get("turnover_amount"),
-            "rate_primary_per_mille": policy_data.get("rate_primary_per_mille"),
-            "deductible_amount": policy_data.get("deductible_amount"),
-            "usa_canada_included": policy_data.get("usa_canada_included"),
-        },
-        "product_prediction": product_prediction,
-        "premium_estimation": premium_estimation,
-        "instructions": (
-            "Return ONLY valid JSON. No text. No markdown. No explanations. "
-            "JSON object must be exactly: "
-            "{"
-            '"estimated_premium":number,'
-            '"confidence":"low|medium|high",'
-            '"reason":"string"'
-            "}. "
-            "Provide a speculative, non-binding HITL estimate. "
-            "If data is incomplete, still provide a rough estimate unless the policy input is completely empty. "
-            "Reason must explicitly say this estimate is indicative only and requires underwriter review."
-        ),
-    }
-
-    body = {
-        "model": model_name,
-        "input": [
-            {
-                "role": "user",
-                "content": [{"type": "input_text", "text": json.dumps(prompt, ensure_ascii=False)}],
-            }
-        ],
-    }
-
-    req = request.Request(
-        "https://api.openai.com/v1/responses",
-        data=json.dumps(body).encode("utf-8"),
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        },
-        method="POST",
-    )
+        return _disabled_llm_estimation("OPENAI_API_KEY not configured")
 
     try:
-        with request.urlopen(req, timeout=20) as response:
-            parsed = json.loads(response.read().decode("utf-8"))
-            raw_response = json.dumps(parsed, ensure_ascii=False)
-            logger.info("Raw OpenAI response (truncated): %s", _truncate_for_log(raw_response))
-            output_text = parsed.get("output_text") if isinstance(parsed, dict) else None
-            logger.info(
-                "LLM response diagnostics: model=%s output_text_length=%s",
-                model_name,
-                len(output_text) if isinstance(output_text, str) else 0,
-            )
-            llm_data, parsed_input = _extract_llm_data(parsed)
-            logger.info("Exact LLM content being parsed: %s", parsed_input)
-            if llm_data is None:
-                return _fallback_llm_estimation(
-                    (
-                        "OpenAI response could not be parsed into structured JSON; indicative fallback prepared for "
-                        f"HITL only. Raw LLM text: {_truncate_for_log((parsed_input or output_text or '').strip())}"
+        client = OpenAI(api_key=api_key)
+        completion = client.beta.chat.completions.parse(
+            model=model_name,
+            temperature=0,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are an underwriting assistant. Return a strictly parsed estimate using the provided schema. "
+                        "The estimate must be indicative only and always require underwriter review (HITL). "
+                        "Set hitl_required=true and status='ok'."
                     ),
-                    premium_estimation,
-                )
-
-            est = llm_data.get("estimated_premium")
-            if not isinstance(est, (int, float)):
-                if _is_effectively_empty_policy(policy_data):
-                    est = 0.0
-                else:
-                    est = _heuristic_estimate(policy_data, premium_estimation)
-            if isinstance(est, (int, float)):
-                est = round(float(est), 2)
-            low = llm_data.get("premium_range_low")
-            high = llm_data.get("premium_range_high")
-            if not isinstance(low, (int, float)) and isinstance(est, (int, float)):
-                low = round(est * 0.8, 2)
-            if not isinstance(high, (int, float)) and isinstance(est, (int, float)):
-                high = round(est * 1.2, 2)
-
-            reason = str(llm_data.get("reason") or "").strip() or "Indicative only, non-binding estimate."
-            if "underwriter review" not in reason.lower():
-                reason = f"{reason} Requires underwriter review."
-
-            normalized = {
-                "status": "ok",
-                "estimated_premium": est if isinstance(est, (int, float)) else None,
-                "premium_range_low": round(float(low), 2) if isinstance(low, (int, float)) else None,
-                "premium_range_high": round(float(high), 2) if isinstance(high, (int, float)) else None,
-                "confidence": llm_data.get("confidence") if llm_data.get("confidence") in {"low", "medium", "high"} else "low",
-                "reason": reason,
-                "explanation": (
-                    "Data used: policy input, product prediction, and premium estimation context. "
-                    "Value source: LLM-generated estimate (with deterministic normalization/range safeguards). "
-                    "HITL review is required because this estimate is indicative and non-binding."
-                ),
-                "missing_data": llm_data.get("missing_data") if isinstance(llm_data.get("missing_data"), list) else [],
-                "hitl_required": True,
-            }
-            return LLMEstimation.model_validate(normalized)
-    except (json.JSONDecodeError, ValueError):
-        return _fallback_llm_estimation(
-            "Invalid OpenAI JSON payload; indicative fallback prepared for HITL only.",
-            premium_estimation,
+                },
+                {
+                    "role": "user",
+                    "content": (
+                        f"Policy data: {policy_data}\n"
+                        f"Product prediction: {product_prediction}\n"
+                        f"Premium estimation context: {premium_estimation}\n"
+                        "Provide an indicative, non-binding premium estimate with rationale and missing_data."
+                    ),
+                },
+            ],
+            response_format=LlmEstimationOutput,
         )
-    except (error.HTTPError, error.URLError, Exception):
-        return _fallback_llm_estimation(
-            "OpenAI exception occurred; indicative fallback prepared for HITL only.",
-            premium_estimation,
+
+        parsed_output = completion.choices[0].message.parsed if completion.choices else None
+        if parsed_output is None:
+            return _error_llm_estimation(
+                "OpenAI structured parsing returned no parsed object. HITL review remains required."
+            )
+
+        reason = parsed_output.reason.strip() if parsed_output.reason else "Indicative only estimate."
+        if "underwriter review" not in reason.lower() and "hitl" not in reason.lower():
+            reason = f"{reason} Requires underwriter review."
+
+        return LLMEstimation(
+            status="ok",
+            estimated_premium=round(float(parsed_output.estimated_premium), 2),
+            premium_range_low=round(float(parsed_output.premium_range_low), 2),
+            premium_range_high=round(float(parsed_output.premium_range_high), 2),
+            confidence=parsed_output.confidence,
+            reason=reason,
+            explanation=(
+                "Data used: policy input, product prediction, and deterministic premium_estimation context. "
+                "Value source: parsed OpenAI structured output. "
+                "HITL review is required because this estimate is indicative and non-binding."
+            ),
+            missing_data=parsed_output.missing_data,
+            hitl_required=True,
+        )
+    except Exception as exc:
+        logger.exception("OpenAI structured estimation failed: %s", exc.__class__.__name__)
+        return _error_llm_estimation(
+            "OpenAI call or structured parsing failed. No LLM estimate was produced; HITL review required."
         )
 
 
