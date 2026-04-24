@@ -70,8 +70,27 @@ Widok prezentuje osobno:
 - confidence,
 - missing data,
 - ostrzeżenie: "LLM estimate is indicative only and requires underwriter review."
+- wyeksponowane `llm_estimation.explanation` nad sekcją raw JSON,
+- raw JSON w sekcji rozwijanej (`details`),
+- podświetlanie pól wejściowych, które LLM oznaczył w `missing_data`,
+- helper pod brakującymi polami: `LLM wskazał, że ta informacja poprawiłaby jakość estymacji.`,
+- przycisk `Uzupełnij przykładowymi danymi` do szybkiego uzupełniania braków bez użycia danych rzeczywistych.
 
-Formularz zawiera też pole `deductible_amount` (franszyza redukcyjna).
+Formularz underwriting questionnaire zawiera edytowalne pola m.in.:
+
+- `rate_primary_per_mille`,
+- `deductible_amount`,
+- `insured_products`,
+- `detailed_risk_factors`,
+- `claims_history`,
+- `territorial_scope`,
+- `usa_canada_included`.
+
+Wysyłka `POST /underwrite` uwzględnia też tekstowe pola opcjonalne:
+
+- `detailed_risk_factors`,
+- `claims_history`,
+- `territorial_scope`.
 
 ## Bezpieczeństwo danych
 
@@ -105,4 +124,3 @@ Then open:
 - Results are support signals only and **not** a final underwriting decision.
 - LLM output is indicative only and always requires human underwriter review (HITL).
 - Never expose backend secrets (for example `OPENAI_API_KEY`) in frontend code.
-
