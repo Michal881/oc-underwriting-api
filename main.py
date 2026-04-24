@@ -58,7 +58,7 @@ class ProductInput(BaseModel):
 
 
 class LLMEstimation(BaseModel):
-    status: Literal["ok", "disabled", "error"]
+    status: Literal["ok", "fallback"]
     estimated_premium: Optional[float]
     premium_range_low: Optional[float]
     premium_range_high: Optional[float]
@@ -77,11 +77,12 @@ class UnderwriteResult(BaseModel):
 
 class LlmEstimationOutput(BaseModel):
     status: Literal["ok"]
-    estimated_premium: float
-    premium_range_low: float
-    premium_range_high: float
+    estimated_premium: Optional[float] = None
+    premium_range_low: Optional[float] = None
+    premium_range_high: Optional[float] = None
     confidence: Literal["low", "medium", "high"]
     reason: str
+    explanation: str
     missing_data: list[str] = Field(default_factory=list)
     hitl_required: Literal[True]
 
@@ -207,9 +208,9 @@ def predict_product(data):
     }
 
 
-def _error_llm_estimation(reason: str) -> LLMEstimation:
+def _fallback_llm_estimation(reason: str) -> LLMEstimation:
     return LLMEstimation(
-        status="error",
+        status="fallback",
         estimated_premium=None,
         premium_range_low=None,
         premium_range_high=None,
@@ -218,23 +219,6 @@ def _error_llm_estimation(reason: str) -> LLMEstimation:
         explanation=(
             "No valid premium estimate could be produced from either LLM output or deterministic inputs. "
             "HITL review is required because this API provides only indicative, non-binding guidance."
-        ),
-        missing_data=[],
-        hitl_required=True,
-    )
-
-
-def _disabled_llm_estimation(reason: str) -> LLMEstimation:
-    return LLMEstimation(
-        status="disabled",
-        estimated_premium=None,
-        premium_range_low=None,
-        premium_range_high=None,
-        confidence="low",
-        reason=reason,
-        explanation=(
-            "LLM estimation is disabled because OPENAI_API_KEY is not configured. "
-            "HITL review is required for any underwriting decision."
         ),
         missing_data=[],
         hitl_required=True,
@@ -250,7 +234,7 @@ def generate_llm_estimation(policy_data, product_prediction, premium_estimation)
         model_name,
     )
     if not api_key:
-        return _disabled_llm_estimation("OPENAI_API_KEY not configured")
+        return _fallback_llm_estimation("OPENAI_API_KEY not configured")
 
     try:
         client = OpenAI(api_key=api_key)
@@ -263,7 +247,8 @@ def generate_llm_estimation(policy_data, product_prediction, premium_estimation)
                     "content": (
                         "You are an underwriting assistant. Return a strictly parsed estimate using the provided schema. "
                         "The estimate must be indicative only and always require underwriter review (HITL). "
-                        "Set hitl_required=true and status='ok'."
+                        "Set hitl_required=true and status='ok'. If you cannot provide numeric premium values, "
+                        "leave estimated_premium, premium_range_low, and premium_range_high as null and provide a useful explanation."
                     ),
                 },
                 {
@@ -281,7 +266,7 @@ def generate_llm_estimation(policy_data, product_prediction, premium_estimation)
 
         parsed_output = completion.choices[0].message.parsed if completion.choices else None
         if parsed_output is None:
-            return _error_llm_estimation(
+            return _fallback_llm_estimation(
                 "OpenAI structured parsing returned no parsed object. HITL review remains required."
             )
 
@@ -289,24 +274,46 @@ def generate_llm_estimation(policy_data, product_prediction, premium_estimation)
         if "underwriter review" not in reason.lower() and "hitl" not in reason.lower():
             reason = f"{reason} Requires underwriter review."
 
-        return LLMEstimation(
-            status="ok",
-            estimated_premium=round(float(parsed_output.estimated_premium), 2),
-            premium_range_low=round(float(parsed_output.premium_range_low), 2),
-            premium_range_high=round(float(parsed_output.premium_range_high), 2),
-            confidence=parsed_output.confidence,
-            reason=reason,
-            explanation=(
-                "Data used: policy input, product prediction, and deterministic premium_estimation context. "
-                "Value source: parsed OpenAI structured output. "
-                "HITL review is required because this estimate is indicative and non-binding."
-            ),
-            missing_data=parsed_output.missing_data,
-            hitl_required=True,
+        explanation = parsed_output.explanation.strip() if parsed_output.explanation else ""
+
+        has_numeric_estimate = (
+            parsed_output.estimated_premium is not None
+            and parsed_output.premium_range_low is not None
+            and parsed_output.premium_range_high is not None
+        )
+
+        if has_numeric_estimate:
+            return LLMEstimation(
+                status="ok",
+                estimated_premium=round(float(parsed_output.estimated_premium), 2),
+                premium_range_low=round(float(parsed_output.premium_range_low), 2),
+                premium_range_high=round(float(parsed_output.premium_range_high), 2),
+                confidence=parsed_output.confidence,
+                reason=reason,
+                explanation=explanation,
+                missing_data=parsed_output.missing_data,
+                hitl_required=True,
+            )
+
+        if explanation:
+            return LLMEstimation(
+                status="ok",
+                estimated_premium=None,
+                premium_range_low=None,
+                premium_range_high=None,
+                confidence="low",
+                reason="OpenAI returned explanation without numeric estimate; HITL review required.",
+                explanation=explanation,
+                missing_data=parsed_output.missing_data,
+                hitl_required=True,
+            )
+
+        return _fallback_llm_estimation(
+            "OpenAI returned no usable explanation or numeric estimate; HITL review required."
         )
     except Exception as exc:
         logger.exception("OpenAI structured estimation failed: %s", exc.__class__.__name__)
-        return _error_llm_estimation(
+        return _fallback_llm_estimation(
             "OpenAI call or structured parsing failed. No LLM estimate was produced; HITL review required."
         )
 

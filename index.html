@@ -21,7 +21,8 @@
     .metric { margin:6px 0; }
     .llm-box { margin-top:14px; padding:14px; border:1px solid #d1d5db; border-radius:12px; background:#f9fafb; }
     .llm-title { margin:0 0 8px 0; font-size:18px; }
-    .llm-explanation { margin:10px 0 0 0; padding:10px 12px; border-left:4px solid #2563eb; background:#eff6ff; border-radius:8px; }
+    .llm-explanation { margin:0 0 12px 0; padding:14px 16px; border-left:5px solid #2563eb; background:#dbeafe; border-radius:10px; font-size:15px; line-height:1.5; }
+    .llm-explainer-title { margin:0 0 6px 0; font-size:13px; text-transform:uppercase; color:#1d4ed8; letter-spacing:.05em; font-weight:700; }
   </style>
 </head>
 <body>
@@ -252,12 +253,15 @@ async function sendRequest() {
     document.getElementById("llm_estimation").style.display = "block";
     document.getElementById("llm_estimation").innerHTML = `
       <h3 class="llm-title">LLM Estimation (HITL)</h3>
+      <div class="llm-explanation">
+        <p class="llm-explainer-title">LLM explanation</p>
+        <strong>${llm.explanation || "brak"}</strong>
+      </div>
       <p class="metric"><strong>Indicative estimate:</strong> ${formatAmount(llm.estimated_premium)}</p>
       <p class="metric"><strong>Premium range:</strong> ${formatAmount(llm.premium_range_low)} - ${formatAmount(llm.premium_range_high)}</p>
       <p class="metric"><strong>Confidence:</strong> ${llm.confidence || "brak"}</p>
       <p class="metric"><strong>Missing data:</strong> ${(llm.missing_data || []).join(", ") || "brak"}</p>
       <p class="metric"><strong>Reason:</strong> ${llm.reason || "brak"}</p>
-      <p class="llm-explanation"><strong>Explanation:</strong> ${llm.explanation || "brak"}</p>
       <p class="metric"><strong>HITL required:</strong> ${llm.hitl_required === true ? "tak" : "nie"}</p>
     `;
 
