@@ -77,6 +77,7 @@
   <div class="card">
     <h2>Wynik</h2>
     <div id="summary"></div>
+    <div id="llm" class="subtitle" style="margin:10px 0 14px 0;"></div>
     <pre id="result">Wybierz scenariusz i kliknij „Uruchom underwriting”.</pre>
   </div>
 
@@ -155,6 +156,7 @@ function loadScenario() {
   document.getElementById("rate").value = s.rate;
 
   document.getElementById("summary").innerHTML = "";
+  document.getElementById("llm").textContent = "";
   document.getElementById("result").textContent = "Kliknij „Uruchom underwriting”.";
 }
 
@@ -185,6 +187,7 @@ async function sendRequest() {
   };
 
   document.getElementById("summary").innerHTML = "";
+  document.getElementById("llm").textContent = "";
   document.getElementById("result").textContent = "Przetwarzanie...";
 
   try {
@@ -206,6 +209,7 @@ async function sendRequest() {
       <span class="badge">Metoda składki: ${result.premium_estimation.method}</span>
     `;
 
+    document.getElementById("llm").textContent = "LLM: " + (result.llm_explanation?.content || "brak");
     document.getElementById("result").textContent = JSON.stringify(result, null, 2);
 
   } catch (error) {
