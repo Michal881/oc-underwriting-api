@@ -21,6 +21,7 @@
     .metric { margin:6px 0; }
     .llm-box { margin-top:14px; padding:14px; border:1px solid #d1d5db; border-radius:12px; background:#f9fafb; }
     .llm-title { margin:0 0 8px 0; font-size:18px; }
+    .llm-explanation { margin:10px 0 0 0; padding:10px 12px; border-left:4px solid #2563eb; background:#eff6ff; border-radius:8px; }
   </style>
 </head>
 <body>
@@ -256,6 +257,7 @@ async function sendRequest() {
       <p class="metric"><strong>Confidence:</strong> ${llm.confidence || "brak"}</p>
       <p class="metric"><strong>Missing data:</strong> ${(llm.missing_data || []).join(", ") || "brak"}</p>
       <p class="metric"><strong>Reason:</strong> ${llm.reason || "brak"}</p>
+      <p class="llm-explanation"><strong>Explanation:</strong> ${llm.explanation || "brak"}</p>
       <p class="metric"><strong>HITL required:</strong> ${llm.hitl_required === true ? "tak" : "nie"}</p>
     `;
 
