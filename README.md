@@ -17,7 +17,7 @@ Przykładowy kształt odpowiedzi:
   "product_prediction": {...},
   "premium_estimation": {...},
   "llm_estimation": {
-    "status": "enabled",
+    "status": "ok",
     "estimated_premium": 18500,
     "premium_range_low": 16000,
     "premium_range_high": 22000,
@@ -31,8 +31,9 @@ Przykładowy kształt odpowiedzi:
 
 ## Zachowanie LLM
 
-- Jeśli `OPENAI_API_KEY` jest ustawiony, backend wywołuje OpenAI Responses API i wymusza JSON schema dla `llm_estimation`.
+- Jeśli `OPENAI_API_KEY` jest ustawiony, backend wywołuje OpenAI Responses API (domyślnie `gpt-4.1-mini`) i najpierw próbuje odczytać structured output, a następnie `output_text`/ekstrakcję JSON jako fallback parser.
 - LLM może zwrócić wskazanie składki nawet wtedy, gdy `premium_estimation.estimated` jest `null`.
+- Backend loguje bezpieczne diagnostyki: model, informację czy klucz API jest obecny oraz czy `output_text` jest puste (bez logowania sekretów).
 - Gdy `OPENAI_API_KEY` nie jest skonfigurowany:
   - `status=disabled`,
   - wszystkie pola kwotowe ustawione na `null`,

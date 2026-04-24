@@ -1,5 +1,7 @@
 import json
+import logging
 import os
+from json import JSONDecoder
 from typing import Literal, Optional
 from urllib import error, request
 
@@ -8,6 +10,8 @@ import pandas as pd
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+
+logger = logging.getLogger(__name__)
 
 
 bundle = joblib.load("premium_model.joblib")
@@ -56,7 +60,7 @@ class ProductInput(BaseModel):
 
 
 class LLMEstimation(BaseModel):
-    status: Literal["enabled", "disabled", "error", "fallback"]
+    status: Literal["ok", "disabled", "error", "fallback"]
     estimated_premium: Optional[float]
     premium_range_low: Optional[float]
     premium_range_high: Optional[float]
@@ -245,12 +249,17 @@ def generate_llm_estimation(policy_data, product_prediction, premium_estimation)
     if not api_key:
         return _disabled_llm_estimation("OPENAI_API_KEY not configured")
 
-    model_name = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    model_name = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
+    logger.info(
+        "Starting LLM estimation. model=%s openai_api_key_present=%s",
+        model_name,
+        bool(api_key),
+    )
     schema = {
         "type": "object",
         "additionalProperties": False,
         "properties": {
-            "status": {"type": "string", "enum": ["enabled", "fallback"]},
+            "status": {"type": "string", "enum": ["ok", "fallback"]},
             "estimated_premium": {"type": ["number", "null"]},
             "premium_range_low": {"type": ["number", "null"]},
             "premium_range_high": {"type": ["number", "null"]},
@@ -288,7 +297,7 @@ def generate_llm_estimation(policy_data, product_prediction, premium_estimation)
         "instructions": (
             "Provide indicative, non-binding premium estimate for human-in-the-loop underwriting review. "
             "The estimate is allowed even when premium_estimation.estimated is null. "
-            "Return JSON only. Set hitl_required=true. "
+            "Return only valid JSON matching the schema. Set hitl_required=true. "
             "Reason must explicitly say estimate is indicative only and requires underwriter review."
         ),
     }
@@ -324,18 +333,73 @@ def generate_llm_estimation(policy_data, product_prediction, premium_estimation)
     try:
         with request.urlopen(req, timeout=20) as response:
             parsed = json.loads(response.read().decode("utf-8"))
-            content = parsed.get("output_text")
-            if not content:
+
+            def _extract_output_parsed(payload: dict) -> Optional[dict]:
+                direct = payload.get("output_parsed")
+                if isinstance(direct, dict):
+                    return direct
+
+                for item in payload.get("output", []):
+                    if not isinstance(item, dict):
+                        continue
+                    for content_item in item.get("content", []):
+                        if isinstance(content_item, dict) and isinstance(content_item.get("parsed"), dict):
+                            return content_item["parsed"]
+                return None
+
+            def _extract_json_from_text(text: str) -> Optional[dict]:
+                candidate = text.strip()
+                if not candidate:
+                    return None
+
+                try:
+                    obj = json.loads(candidate)
+                    if isinstance(obj, dict):
+                        return obj
+                except json.JSONDecodeError:
+                    pass
+
+                decoder = JSONDecoder()
+                for index, char in enumerate(candidate):
+                    if char != "{":
+                        continue
+                    try:
+                        obj, _ = decoder.raw_decode(candidate[index:])
+                        if isinstance(obj, dict):
+                            return obj
+                    except json.JSONDecodeError:
+                        continue
+                return None
+
+            llm_data = _extract_output_parsed(parsed)
+            parsing_path = "output_parsed"
+
+            output_text = parsed.get("output_text")
+            output_text_empty = not bool(isinstance(output_text, str) and output_text.strip())
+            logger.info("LLM response diagnostics: model=%s output_text_empty=%s", model_name, output_text_empty)
+
+            if llm_data is None and isinstance(output_text, str):
+                llm_data = _extract_json_from_text(output_text)
+                parsing_path = "output_text/json_extraction"
+
+            if llm_data is None:
                 return _fallback_llm_estimation(
-                    "OpenAI returned empty structured payload; indicative fallback prepared for HITL only.",
+                    "OpenAI response could not be parsed into structured JSON; indicative fallback prepared for HITL only.",
                     premium_estimation,
                 )
 
-            llm_data = json.loads(content)
             llm_data["hitl_required"] = True
-            if llm_data.get("status") not in ["enabled", "fallback"]:
-                llm_data["status"] = "enabled"
-
+            if llm_data.get("status") == "enabled":
+                llm_data["status"] = "ok"
+            if llm_data.get("status") not in ["ok", "fallback"]:
+                llm_data["status"] = "ok"
+            reason = str(llm_data.get("reason") or "").strip()
+            if not reason:
+                reason = "Indicative only, non-binding; requires underwriter review."
+            elif "underwriter review" not in reason.lower():
+                reason = f"{reason} Indicative only, non-binding; requires underwriter review."
+            llm_data["reason"] = reason
+            logger.info("LLM response parsed successfully via=%s", parsing_path)
             return LLMEstimation.model_validate(llm_data)
     except (json.JSONDecodeError, ValueError):
         return _fallback_llm_estimation(
