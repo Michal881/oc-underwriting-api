@@ -16,6 +16,7 @@ app = FastAPI(title="OC Underwriting API")
 class PolicyInput(BaseModel):
     product_family: Optional[str] = None
     insured_activity: Optional[str] = None
+    scope_of_insurance: Optional[str] = None
     sum_guaranteed_amount: Optional[float] = None
     turnover_amount: Optional[float] = None
     rate_primary_per_mille: Optional[float] = None
