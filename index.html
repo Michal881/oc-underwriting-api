@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <title>OC Underwriting Engine</title>
+  <style>
+    body { margin:0; font-family:Arial, sans-serif; background:#f4f6f8; color:#1f2937; }
+    .container { max-width:900px; margin:40px auto; padding:24px; }
+    .card { background:white; border-radius:18px; padding:28px; box-shadow:0 10px 30px rgba(0,0,0,.08); margin-bottom:20px; }
+    h1 { margin-top:0; }
+    .subtitle, .footer { color:#6b7280; }
+    label { font-weight:600; margin-top:14px; display:block; }
+    input, textarea, select { width:100%; box-sizing:border-box; padding:12px; margin-top:6px; border:1px solid #d1d5db; border-radius:10px; font-size:15px; }
+    textarea { min-height:85px; }
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+    button { margin-top:24px; width:100%; padding:14px; border:none; border-radius:12px; background:#111827; color:white; font-size:16px; font-weight:700; cursor:pointer; }
+    button:hover { background:#374151; }
+    pre { background:#111827; color:#d1fae5; padding:18px; border-radius:14px; overflow-x:auto; }
+    .badge { display:inline-block; padding:6px 10px; border-radius:999px; background:#e5e7eb; margin:0 8px 8px 0; font-size:13px; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="card">
+    <h1>OC Underwriting Engine</h1>
+    <p class="subtitle">Bezpieczne scenariusze testowe — bez nazw ubezpieczonych i danych klientów.</p>
+
+    <label>Scenariusz</label>
+    <select id="scenario" onchange="loadScenario()">
+      <option value="law">Kancelaria / usługi prawne</option>
+      <option value="architect">Architekt / projektant</option>
+      <option value="product">Producent / OC za produkt</option>
+      <option value="property">Zarządzanie nieruchomością</option>
+      <option value="large">Duże ryzyko korporacyjne</option>
+      <option value="rate">Wycena ze stawki i obrotu</option>
+    </select>
+
+    <label>Produkt OC</label>
+    <select id="product_family">
+      <option value="">Nie podano — system spróbuje rozpoznać</option>
+      <option value="oc_zawodowe">OC zawodowe</option>
+      <option value="oc_ogolne">OC ogólne</option>
+      <option value="oc_produkt_lub_mieszane">OC produkt / mieszane</option>
+    </select>
+
+    <label>Opis działalności</label>
+    <textarea id="activity"></textarea>
+
+    <label>Zakres ubezpieczenia</label>
+    <textarea id="scope"></textarea>
+
+    <div class="grid">
+      <div>
+        <label>Suma gwarancyjna</label>
+        <input id="sum" type="number" />
+      </div>
+      <div>
+        <label>Składka referencyjna / znana</label>
+        <input id="premium" type="number" />
+      </div>
+    </div>
+
+    <div class="grid">
+      <div>
+        <label>Obrót</label>
+        <input id="turnover" type="number" />
+      </div>
+      <div>
+        <label>Stawka ‰</label>
+        <input id="rate" type="number" step="0.01" />
+      </div>
+    </div>
+
+    <button onclick="sendRequest()">Uruchom underwriting</button>
+  </div>
+
+  <div class="card">
+    <h2>Wynik</h2>
+    <div id="summary"></div>
+    <pre id="result">Wybierz scenariusz i kliknij „Uruchom underwriting”.</pre>
+  </div>
+
+  <p class="footer">MVP demonstracyjny — nie stanowi decyzji underwritingowej.</p>
+</div>
+
+<script>
+const API_URL = "https://oc-underwriting-api.onrender.com/underwrite";
+
+const scenarios = {
+  law: {
+    product_family: "oc_zawodowe",
+    activity: "świadczenie pomocy prawnej i doradztwa podatkowego",
+    scope: "odpowiedzialność cywilna zawodowa za szkody wynikające z wykonywania usług prawnych",
+    sum: 5000000,
+    premium: 30000,
+    turnover: "",
+    rate: ""
+  },
+  architect: {
+    product_family: "oc_zawodowe",
+    activity: "usługi architektoniczne, projektowanie budynków, nadzór autorski",
+    scope: "odpowiedzialność cywilna zawodowa projektanta i architekta",
+    sum: 1000000,
+    premium: 12000,
+    turnover: "",
+    rate: ""
+  },
+  product: {
+    product_family: "oc_produkt_lub_mieszane",
+    activity: "produkcja i sprzedaż wyrobów przemysłowych",
+    scope: "OC ogólna z włączeniem odpowiedzialności za produkt i wykonane usługi",
+    sum: 10000000,
+    premium: 120960,
+    turnover: "",
+    rate: ""
+  },
+  property: {
+    product_family: "oc_ogolne",
+    activity: "posiadanie i zarządzanie nieruchomością komercyjną",
+    scope: "OC ogólna z tytułu posiadania mienia i prowadzonej działalności",
+    sum: 3000000,
+    premium: 9100,
+    turnover: "",
+    rate: ""
+  },
+  large: {
+    product_family: "oc_ogolne",
+    activity: "duża działalność produkcyjna i dystrybucyjna o zasięgu międzynarodowym",
+    scope: "OC ogólna, produktowa, wykonane usługi, szeroki zakres terytorialny",
+    sum: 30000000,
+    premium: 500000,
+    turnover: "",
+    rate: ""
+  },
+  rate: {
+    product_family: "oc_ogolne",
+    activity: "prowadzenie działalności gospodarczej o znanym obrocie",
+    scope: "OC ogólna liczona od obrotu i stawki",
+    sum: 5000000,
+    premium: "",
+    turnover: 20000000,
+    rate: 0.75
+  }
+};
+
+function loadScenario() {
+  const s = scenarios[document.getElementById("scenario").value];
+
+  document.getElementById("product_family").value = s.product_family;
+  document.getElementById("activity").value = s.activity;
+  document.getElementById("scope").value = s.scope;
+  document.getElementById("sum").value = s.sum;
+  document.getElementById("premium").value = s.premium;
+  document.getElementById("turnover").value = s.turnover;
+  document.getElementById("rate").value = s.rate;
+
+  document.getElementById("summary").innerHTML = "";
+  document.getElementById("result").textContent = "Kliknij „Uruchom underwriting”.";
+}
+
+async function sendRequest() {
+  const premiumValue = document.getElementById("premium").value;
+  const turnoverValue = document.getElementById("turnover").value;
+  const rateValue = document.getElementById("rate").value;
+
+  const scenario = document.getElementById("scenario").value;
+
+  const data = {
+    product_family: document.getElementById("product_family").value || null,
+    insured_activity: document.getElementById("activity").value,
+    scope_of_insurance: document.getElementById("scope").value,
+    sum_guaranteed_amount: Number(document.getElementById("sum").value),
+    premium_amount: premiumValue ? Number(premiumValue) : null,
+    turnover_amount: turnoverValue ? Number(turnoverValue) : null,
+    rate_primary_per_mille: rateValue ? Number(rateValue) : null,
+
+    covers_general_liability: 1,
+    covers_professional_liability: scenario === "law" || scenario === "architect" ? 1 : 0,
+    covers_product_liability: scenario === "product" || scenario === "large" ? 1 : 0,
+    covers_completed_operations: scenario === "product" || scenario === "large" ? 1 : 0,
+    covers_pure_financial_loss: scenario === "law" ? 1 : 0,
+    covers_employers_liability: 0,
+    covers_documents_loss: scenario === "law" ? 1 : 0,
+    covers_subcontractors: scenario === "architect" ? 1 : 0
+  };
+
+  document.getElementById("summary").innerHTML = "";
+  document.getElementById("result").textContent = "Przetwarzanie...";
+
+  try {
+    const response = await fetch(API_URL, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(data)
+    });
+
+    if (!response.ok) {
+      throw new Error("API zwróciło błąd HTTP: " + response.status);
+    }
+
+    const result = await response.json();
+
+    document.getElementById("summary").innerHTML = `
+      <span class="badge">Produkt: ${result.product_prediction.product_family}</span>
+      <span class="badge">Confidence: ${result.product_prediction.confidence}</span>
+      <span class="badge">Metoda składki: ${result.premium_estimation.method}</span>
+    `;
+
+    document.getElementById("result").textContent = JSON.stringify(result, null, 2);
+
+  } catch (error) {
+    document.getElementById("result").textContent =
+      "Błąd połączenia z API:\n" + error.message;
+  }
+}
+
+loadScenario();
+</script>
+</body>
+</html>
