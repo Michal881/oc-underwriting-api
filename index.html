@@ -88,6 +88,19 @@
     }
 
     .field { margin-bottom: 12px; }
+    .field.missing-highlight {
+      padding: 10px;
+      border-radius: 12px;
+      border: 1px solid #fca5a5;
+      background: #fff1f2;
+    }
+
+    .field-helper {
+      margin-top: 6px;
+      color: #9f1239;
+      font-size: 0.82rem;
+      font-weight: 600;
+    }
 
     label {
       display: block;
@@ -249,6 +262,20 @@
       margin-top: 8px;
     }
 
+    .explanation-box {
+      border: 1px solid #bfdbfe;
+      background: #eff6ff;
+      border-radius: 12px;
+      padding: 12px;
+      margin-top: 14px;
+    }
+
+    .explanation-box h3 {
+      margin: 0 0 6px;
+      font-size: 0.95rem;
+      color: #1e3a8a;
+    }
+
     @media (max-width: 980px) {
       .grid, .grid-3, .result-grid, .checkbox-grid { grid-template-columns: 1fr; }
     }
@@ -267,7 +294,7 @@
       </div>
 
       <div class="grid">
-        <div class="field">
+        <div class="field" data-field="product_family">
           <label for="product_family">product_family</label>
           <select id="product_family">
             <option value="">(empty / auto-detect)</option>
@@ -277,47 +304,62 @@
             <option value="nieustalone">nieustalone</option>
           </select>
         </div>
-        <div class="field">
+        <div class="field" data-field="insured_products">
           <label for="insured_products">insured_products</label>
           <input id="insured_products" type="text" />
         </div>
       </div>
 
-      <div class="field">
+      <div class="field" data-field="insured_activity">
         <label for="insured_activity">insured_activity</label>
         <textarea id="insured_activity"></textarea>
       </div>
 
-      <div class="field">
+      <div class="field" data-field="scope_of_insurance">
         <label for="scope_of_insurance">scope_of_insurance</label>
         <textarea id="scope_of_insurance"></textarea>
       </div>
 
+      <div class="field" data-field="detailed_risk_factors">
+        <label for="detailed_risk_factors">detailed_risk_factors</label>
+        <textarea id="detailed_risk_factors" placeholder="Synthetic risk profile, controls, processes, incident prevention."></textarea>
+      </div>
+
+      <div class="field" data-field="claims_history">
+        <label for="claims_history">claims_history</label>
+        <textarea id="claims_history" placeholder="Synthetic summary of prior claims, if any."></textarea>
+      </div>
+
+      <div class="field" data-field="territorial_scope">
+        <label for="territorial_scope">territorial_scope</label>
+        <input id="territorial_scope" type="text" placeholder="e.g. Poland + EU, synthetic distribution only" />
+      </div>
+
       <div class="grid-3">
-        <div class="field">
+        <div class="field" data-field="sum_guaranteed_amount">
           <label for="sum_guaranteed_amount">sum_guaranteed_amount</label>
           <input id="sum_guaranteed_amount" type="number" min="0" step="1" />
         </div>
-        <div class="field">
+        <div class="field" data-field="turnover_amount">
           <label for="turnover_amount">turnover_amount</label>
           <input id="turnover_amount" type="number" min="0" step="1" />
         </div>
-        <div class="field">
+        <div class="field" data-field="rate_primary_per_mille">
           <label for="rate_primary_per_mille">rate_primary_per_mille</label>
           <input id="rate_primary_per_mille" type="number" min="0" step="0.01" />
         </div>
       </div>
 
       <div class="grid-3">
-        <div class="field">
+        <div class="field" data-field="premium_amount">
           <label for="premium_amount">premium_amount</label>
           <input id="premium_amount" type="number" min="0" step="1" />
         </div>
-        <div class="field">
+        <div class="field" data-field="deductible_amount">
           <label for="deductible_amount">deductible_amount</label>
           <input id="deductible_amount" type="number" min="0" step="1" />
         </div>
-        <div class="field">
+        <div class="field" data-field="usa_canada_included">
           <label for="usa_canada_included">usa_canada_included</label>
           <select id="usa_canada_included">
             <option value="false">false</option>
@@ -343,6 +385,7 @@
 
       <div class="actions">
         <button id="submitBtn" class="primary" type="button">Run /underwrite</button>
+        <button id="fillMissingBtn" class="secondary" type="button">Uzupełnij przykładowymi danymi</button>
         <button id="reloadScenarioBtn" class="secondary" type="button">Reload selected scenario</button>
       </div>
       <p id="loading" class="loading" hidden>Submitting request and waiting for response...</p>
@@ -370,6 +413,11 @@
         </article>
       </div>
 
+      <div id="llmExplanationBox" class="explanation-box" hidden>
+        <h3>LLM explanation</h3>
+        <div id="llmExplanationText" class="muted">No explanation yet.</div>
+      </div>
+
       <details class="raw-json">
         <summary>Raw JSON response</summary>
         <pre id="jsonResult">{}</pre>
@@ -388,6 +436,9 @@
           insured_activity: "Operation of a mid-size restaurant and event catering service using synthetic data.",
           scope_of_insurance: "General liability for daily operations, guest incidents, and catering services.",
           insured_products: "Prepared meals, packaged takeaway products, non-alcoholic beverages.",
+          detailed_risk_factors: "Synthetic medium footfall, HACCP procedures, quarterly safety drills, documented cleaning checks.",
+          claims_history: "Synthetic: 1 minor slip claim in 3 years, settled below deductible threshold.",
+          territorial_scope: "Poland only; no cross-border services.",
           sum_guaranteed_amount: 2000000,
           turnover_amount: 4500000,
           rate_primary_per_mille: 1.4,
@@ -411,6 +462,9 @@
           insured_activity: "Management of synthetic residential and mixed-use properties.",
           scope_of_insurance: "General liability tied to property possession, tenant areas, and maintenance coordination.",
           insured_products: "Property management services only.",
+          detailed_risk_factors: "Synthetic aging infrastructure exposure, monthly building inspections, documented maintenance vendor controls.",
+          claims_history: "Synthetic: no material claims in last 5 years.",
+          territorial_scope: "Poland and selected EU sites.",
           sum_guaranteed_amount: 3000000,
           turnover_amount: 6000000,
           rate_primary_per_mille: 1.1,
@@ -434,6 +488,9 @@
           insured_activity: "Bookkeeping and payroll advisory provided by a synthetic accounting office.",
           scope_of_insurance: "Professional liability for accounting errors and advisory omissions.",
           insured_products: "Accounting, payroll and tax filing support services.",
+          detailed_risk_factors: "Synthetic dual-review workflows, encrypted document exchange, annual compliance training.",
+          claims_history: "Synthetic: one late-filing allegation, no indemnity payment.",
+          territorial_scope: "Poland only.",
           sum_guaranteed_amount: 1500000,
           turnover_amount: 2200000,
           rate_primary_per_mille: 2.0,
@@ -457,6 +514,9 @@
           insured_activity: "Synthetic contractor executing renovation and fit-out works.",
           scope_of_insurance: "General liability including completed operations and subcontracted works.",
           insured_products: "Renovation, fit-out, and installation services.",
+          detailed_risk_factors: "Synthetic subcontractor reliance, mandatory safety induction, site-specific risk assessments before each project.",
+          claims_history: "Synthetic: two minor third-party property damage claims in 4 years.",
+          territorial_scope: "Poland + temporary projects in EU.",
           sum_guaranteed_amount: 5000000,
           turnover_amount: 12000000,
           rate_primary_per_mille: 2.4,
@@ -480,6 +540,9 @@
           insured_activity: "Synthetic manufacturer of household electrical accessories.",
           scope_of_insurance: "General and product liability for manufactured and distributed goods.",
           insured_products: "Adapters, power strips, and low-voltage electronic accessories.",
+          detailed_risk_factors: "Synthetic batch quality controls, supplier audits, periodic product testing with documented traceability.",
+          claims_history: "Synthetic: no bodily injury claims, one product return wave due to packaging defect.",
+          territorial_scope: "EU distribution only.",
           sum_guaranteed_amount: 10000000,
           turnover_amount: 25000000,
           rate_primary_per_mille: 3.0,
@@ -499,7 +562,8 @@
     };
 
     const textFields = [
-      "product_family", "insured_activity", "scope_of_insurance", "insured_products", "usa_canada_included"
+      "product_family", "insured_activity", "scope_of_insurance", "insured_products",
+      "detailed_risk_factors", "claims_history", "territorial_scope", "usa_canada_included"
     ];
 
     const numericFields = [
@@ -511,6 +575,16 @@
       "covers_completed_operations", "covers_pure_financial_loss", "covers_employers_liability",
       "covers_documents_loss", "covers_subcontractors"
     ];
+    const DEMO_FILL_VALUES = {
+      rate_primary_per_mille: 1.75,
+      deductible_amount: 5000,
+      insured_products: "Synthetic insured products/services bundle for demo underwriting iteration.",
+      detailed_risk_factors: "Synthetic risk factors: documented controls, staff training cadence, preventive maintenance and incident escalation workflow.",
+      claims_history: "Synthetic claims history: no severe claims in last 3 policy years; isolated low-severity event handled internally.",
+      territorial_scope: "Synthetic territorial scope: Poland + EU (excluding sanctioned territories).",
+      usa_canada_included: "false"
+    };
+    let lastMissingFields = [];
 
     function fmtAmount(value) {
       if (value === null || value === undefined || value === "") {
@@ -559,6 +633,7 @@
       });
 
       clearStatusAndResults();
+      highlightMissingFields([]);
     }
 
     function clearStatusAndResults() {
@@ -568,7 +643,36 @@
       document.getElementById("productResult").innerHTML = '<span class="muted">No result yet.</span>';
       document.getElementById("premiumResult").innerHTML = '<span class="muted">No result yet.</span>';
       document.getElementById("llmResult").innerHTML = '<span class="muted">No result yet.</span>';
+      document.getElementById("llmExplanationBox").hidden = true;
+      document.getElementById("llmExplanationText").textContent = "No explanation yet.";
       document.getElementById("jsonResult").textContent = "{}";
+      lastMissingFields = [];
+    }
+
+    function normalizeFieldName(name) {
+      return String(name || "")
+        .trim()
+        .toLowerCase()
+        .replace(/[^\w\s]/g, "")
+        .replace(/\s+/g, "_");
+    }
+
+    function highlightMissingFields(missingData) {
+      const normalizedMissing = new Set((missingData || []).map(normalizeFieldName));
+      document.querySelectorAll("[data-field]").forEach((fieldEl) => {
+        const fieldName = normalizeFieldName(fieldEl.dataset.field);
+        const existingHelper = fieldEl.querySelector(".field-helper");
+        if (existingHelper) existingHelper.remove();
+        fieldEl.classList.remove("missing-highlight");
+
+        if (normalizedMissing.has(fieldName)) {
+          fieldEl.classList.add("missing-highlight");
+          const helper = document.createElement("p");
+          helper.className = "field-helper";
+          helper.textContent = "LLM wskazał, że ta informacja poprawiłaby jakość estymacji.";
+          fieldEl.appendChild(helper);
+        }
+      });
     }
 
     function collectPayload() {
@@ -578,6 +682,9 @@
       payload.insured_activity = document.getElementById("insured_activity").value || null;
       payload.scope_of_insurance = document.getElementById("scope_of_insurance").value || null;
       payload.insured_products = document.getElementById("insured_products").value || null;
+      payload.detailed_risk_factors = document.getElementById("detailed_risk_factors").value || null;
+      payload.claims_history = document.getElementById("claims_history").value || null;
+      payload.territorial_scope = document.getElementById("territorial_scope").value || null;
 
       numericFields.forEach((field) => {
         const rawValue = document.getElementById(field).value;
@@ -634,10 +741,34 @@
         <div class="metric"><strong>premium_range_high:</strong> ${fmtAmount(llm.premium_range_high)}</div>
         <div class="metric"><strong>confidence:</strong> ${llm.confidence ?? "—"}</div>
         <div class="metric"><strong>reason:</strong> ${llm.reason ?? "—"}</div>
-        <div class="metric"><strong>explanation:</strong> ${llm.explanation ?? "—"}</div>
         <div class="metric"><strong>missing_data:</strong> ${missingData}</div>
         <div class="metric"><strong>HITL warning:</strong> ${llm.hitl_required ? "Underwriter review required" : "No"}</div>
       `;
+    }
+
+    function fillMissingWithDemoData() {
+      const targets = lastMissingFields.length ? lastMissingFields : Object.keys(DEMO_FILL_VALUES);
+      targets.forEach((field) => {
+        const normalizedField = normalizeFieldName(field);
+        const value = DEMO_FILL_VALUES[normalizedField];
+        if (value === undefined) return;
+        const el = document.getElementById(normalizedField);
+        if (!el) return;
+
+        if (el.tagName === "SELECT") {
+          el.value = String(value);
+          return;
+        }
+
+        if (el.type === "number") {
+          if (el.value === "") el.value = String(value);
+          return;
+        }
+
+        if (!el.value || !el.value.trim()) {
+          el.value = String(value);
+        }
+      });
     }
 
     async function submitUnderwrite() {
@@ -674,6 +805,11 @@
         document.getElementById("productResult").innerHTML = renderProductCard(data.product_prediction);
         document.getElementById("premiumResult").innerHTML = renderPremiumCard(data.premium_estimation);
         document.getElementById("llmResult").innerHTML = renderLlmCard(data.llm_estimation);
+        const explanationEl = document.getElementById("llmExplanationText");
+        explanationEl.textContent = data.llm_estimation?.explanation || "No explanation provided.";
+        document.getElementById("llmExplanationBox").hidden = false;
+        lastMissingFields = Array.isArray(data.llm_estimation?.missing_data) ? data.llm_estimation.missing_data : [];
+        highlightMissingFields(lastMissingFields);
         document.getElementById("jsonResult").textContent = JSON.stringify(data, null, 2);
       } catch (error) {
         errorEl.hidden = false;
@@ -686,6 +822,7 @@
 
     document.getElementById("scenario").addEventListener("change", loadScenario);
     document.getElementById("reloadScenarioBtn").addEventListener("click", loadScenario);
+    document.getElementById("fillMissingBtn").addEventListener("click", fillMissingWithDemoData);
     document.getElementById("submitBtn").addEventListener("click", submitUnderwrite);
 
     setScenarioOptions();

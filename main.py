@@ -32,6 +32,9 @@ class PolicyInput(BaseModel):
     insured_activity: Optional[str] = None
     scope_of_insurance: Optional[str] = None
     insured_products: Optional[str] = None
+    detailed_risk_factors: Optional[str] = None
+    claims_history: Optional[str] = None
+    territorial_scope: Optional[str] = None
 
     sum_guaranteed_amount: Optional[float] = None
     turnover_amount: Optional[float] = None
