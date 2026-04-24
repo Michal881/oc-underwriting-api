@@ -95,6 +95,10 @@
       background: #fff1f2;
     }
 
+    .missing-input {
+      border-color: #dc2626 !important;
+    }
+
     .field-helper {
       margin-top: 6px;
       color: #9f1239;
@@ -321,17 +325,17 @@
       </div>
 
       <div class="field" data-field="detailed_risk_factors">
-        <label for="detailed_risk_factors">detailed_risk_factors</label>
+        <label for="detailed_risk_factors">Czynniki ryzyka</label>
         <textarea id="detailed_risk_factors" placeholder="Synthetic risk profile, controls, processes, incident prevention."></textarea>
       </div>
 
       <div class="field" data-field="claims_history">
-        <label for="claims_history">claims_history</label>
+        <label for="claims_history">Historia szkód</label>
         <textarea id="claims_history" placeholder="Synthetic summary of prior claims, if any."></textarea>
       </div>
 
       <div class="field" data-field="territorial_scope">
-        <label for="territorial_scope">territorial_scope</label>
+        <label for="territorial_scope">Zakres terytorialny</label>
         <input id="territorial_scope" type="text" placeholder="e.g. Poland + EU, synthetic distribution only" />
       </div>
 
@@ -356,7 +360,7 @@
           <input id="premium_amount" type="number" min="0" step="1" />
         </div>
         <div class="field" data-field="deductible_amount">
-          <label for="deductible_amount">deductible_amount</label>
+          <label for="deductible_amount">Franszyza</label>
           <input id="deductible_amount" type="number" min="0" step="1" />
         </div>
         <div class="field" data-field="usa_canada_included">
@@ -662,14 +666,17 @@
       document.querySelectorAll("[data-field]").forEach((fieldEl) => {
         const fieldName = normalizeFieldName(fieldEl.dataset.field);
         const existingHelper = fieldEl.querySelector(".field-helper");
+        const inputEl = fieldEl.querySelector("input, select, textarea");
         if (existingHelper) existingHelper.remove();
         fieldEl.classList.remove("missing-highlight");
+        if (inputEl) inputEl.classList.remove("missing-input");
 
         if (normalizedMissing.has(fieldName)) {
           fieldEl.classList.add("missing-highlight");
+          if (inputEl) inputEl.classList.add("missing-input");
           const helper = document.createElement("p");
           helper.className = "field-helper";
-          helper.textContent = "LLM wskazał, że ta informacja poprawiłaby jakość estymacji.";
+          helper.textContent = "To pole jest wymagane dla lepszej estymacji";
           fieldEl.appendChild(helper);
         }
       });
