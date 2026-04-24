@@ -17,6 +17,8 @@ class PolicyInput(BaseModel):
     product_family: Optional[str] = None
     insured_activity: Optional[str] = None
     scope_of_insurance: Optional[str] = None
+    insured_products: Optional[str] = None
+
     sum_guaranteed_amount: Optional[float] = None
     turnover_amount: Optional[float] = None
     rate_primary_per_mille: Optional[float] = None
@@ -34,6 +36,7 @@ class PolicyInput(BaseModel):
 
 
 class ProductInput(BaseModel):
+    product_family: Optional[str] = None
     insured_activity: Optional[str] = None
     scope_of_insurance: Optional[str] = None
     insured_products: Optional[str] = None
@@ -70,14 +73,15 @@ def add_features(df):
 
     df["product_family"] = df["product_family"].fillna("nieustalone")
     df["product_family_code"] = df["product_family"].astype("category").cat.codes
-    df["activity_len"] = df["insured_activity"].fillna("").apply(len)
+
+    df["insured_activity"] = df["insured_activity"].fillna("")
+    df["activity_len"] = df["insured_activity"].apply(len)
 
     keywords = ["budowl", "produkc", "doradzt", "praw", "księg"]
 
     for kw in keywords:
         df[f"kw_{kw}"] = (
             df["insured_activity"]
-            .fillna("")
             .str.lower()
             .str.contains(kw)
             .astype(int)
@@ -126,6 +130,13 @@ def estimate(policy_dict):
 
 
 def predict_product(data):
+    if data.get("product_family") and data.get("product_family") != "nieustalone":
+        return {
+            "product_family": data.get("product_family"),
+            "confidence": "high",
+            "reason": "product_family provided in input",
+        }
+
     text = " ".join(
         [
             data.get("insured_activity") or "",
@@ -141,14 +152,14 @@ def predict_product(data):
             "reason": "wykryto sygnały działalności zawodowej",
         }
 
-    if any(x in text for x in ["produkt", "produkc", "sprzedaż", "wyrób"]):
+    if any(x in text for x in ["produkt", "produkc", "sprzedaż", "wyrób", "wykonane usługi", "completed operations"]):
         return {
             "product_family": "oc_produkt_lub_mieszane",
             "confidence": "medium",
-            "reason": "wykryto sygnały produkcji lub produktu",
+            "reason": "wykryto sygnały produkcji, produktu lub wykonanych usług",
         }
 
-    if any(x in text for x in ["nieruchomo", "posiadanie", "zarządzanie"]):
+    if any(x in text for x in ["nieruchomo", "posiadanie", "zarządzanie", "oc ogólna", "prowadzonej działalności"]):
         return {
             "product_family": "oc_ogolne",
             "confidence": "medium",
@@ -180,12 +191,16 @@ def estimate_endpoint(policy: PolicyInput):
 @app.post("/predict-product")
 def predict_product_endpoint(policy: ProductInput):
     return predict_product(policy.model_dump())
+
+
 @app.post("/underwrite")
 def underwrite(policy: PolicyInput):
-    product = predict_product(policy.model_dump())
-    premium = estimate(policy.model_dump())
+    data = policy.model_dump()
+
+    product = predict_product(data)
+    premium = estimate(data)
 
     return {
         "product_prediction": product,
-        "premium_estimation": premium
+        "premium_estimation": premium,
     }
