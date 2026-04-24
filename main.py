@@ -67,6 +67,7 @@ class LLMEstimation(BaseModel):
     premium_range_high: Optional[float]
     confidence: Literal["low", "medium", "high"]
     reason: str
+    explanation: str
     missing_data: list[str] = Field(default_factory=list)
     hitl_required: bool = True
 
@@ -206,6 +207,10 @@ def _error_llm_estimation(reason: str) -> LLMEstimation:
         premium_range_high=None,
         confidence="low",
         reason=reason,
+        explanation=(
+            "No valid premium estimate could be produced from either LLM output or deterministic inputs. "
+            "HITL review is required because this API provides only indicative, non-binding guidance."
+        ),
         missing_data=[],
         hitl_required=True,
     )
@@ -220,13 +225,36 @@ def _fallback_llm_estimation(reason: str, premium_estimation: dict) -> LLMEstima
         low = None
         high = None
 
+    source_method = premium_estimation.get("method")
+    if isinstance(base_estimate, (int, float)):
+        status = "ok"
+        if source_method in {"rate", "rate_minimum"}:
+            effective_reason = "Indicative estimate calculated from turnover × rate; HITL review required."
+        else:
+            effective_reason = "Indicative estimate calculated from deterministic fallback inputs; HITL review required."
+        explanation = (
+            "Data used: available underwriting input fields and deterministic premium fallback inputs "
+            f"(premium_estimation.method={source_method or 'unknown'}). "
+            "Value source: deterministic fallback, not direct LLM JSON output. "
+            "HITL review is required because this estimate is indicative/non-binding and must be validated by an underwriter."
+        )
+    else:
+        status = "fallback"
+        effective_reason = reason
+        explanation = (
+            "Data used: available underwriting inputs, but insufficient numeric fields were present to compute "
+            "a deterministic indicative premium. Value source: fallback path after LLM output issue/unavailability. "
+            "HITL review is required for any underwriting decision."
+        )
+
     return LLMEstimation(
-        status="fallback",
+        status=status,
         estimated_premium=float(base_estimate) if isinstance(base_estimate, (int, float)) else None,
         premium_range_low=low,
         premium_range_high=high,
         confidence="low",
-        reason=reason,
+        reason=effective_reason,
+        explanation=explanation,
         missing_data=[],
         hitl_required=True,
     )
@@ -455,6 +483,11 @@ def generate_llm_estimation(policy_data, product_prediction, premium_estimation)
                 "premium_range_high": round(float(high), 2) if isinstance(high, (int, float)) else None,
                 "confidence": llm_data.get("confidence") if llm_data.get("confidence") in {"low", "medium", "high"} else "low",
                 "reason": reason,
+                "explanation": (
+                    "Data used: policy input, product prediction, and premium estimation context. "
+                    "Value source: LLM-generated estimate (with deterministic normalization/range safeguards). "
+                    "HITL review is required because this estimate is indicative and non-binding."
+                ),
                 "missing_data": llm_data.get("missing_data") if isinstance(llm_data.get("missing_data"), list) else [],
                 "hitl_required": True,
             }
