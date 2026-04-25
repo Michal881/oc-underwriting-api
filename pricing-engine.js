@@ -55,9 +55,12 @@ function calculateBaseExposure(formData, pricingIndustryGroup) {
 }
 
 function calculateIndicativePremium(formData, uwResult) {
-  const pricingIndustryGroup = resolvePricingIndustryGroup(formData);
+  const sanitizedData = typeof window.sanitizeFormData === 'function'
+    ? window.sanitizeFormData(formData)
+    : formData;
+  const pricingIndustryGroup = resolvePricingIndustryGroup(sanitizedData);
   const baseRate = BASE_RATES_BY_INDUSTRY[pricingIndustryGroup] || BASE_RATES_BY_INDUSTRY.business_services;
-  const baseExposure = calculateBaseExposure(formData, pricingIndustryGroup);
+  const baseExposure = calculateBaseExposure(sanitizedData, pricingIndustryGroup);
   const appliedMultipliers = [];
 
   let multiplier = 1;
@@ -71,35 +74,35 @@ function calculateIndicativePremium(formData, uwResult) {
     }
   };
 
-  if (formData.produkt === 'tak') {
+  if (sanitizedData.produkt === 'tak') {
     applyMultiplier('product_exposure', 'Ekspozycja produktowa', 1.2);
   }
 
-  if (formData.usa_kanada === 'tak') {
+  if (sanitizedData.usa_kanada === 'tak') {
     applyMultiplier('usa_canada', 'Ekspozycja USA/Kanada', 2, true);
   }
 
-  if (formData.srodowisko === 'średnie') {
+  if (sanitizedData.srodowisko === 'średnie') {
     applyMultiplier('env_medium', 'Ekspozycja środowiskowa: średnia', 1.25);
   }
 
-  if (formData.srodowisko === 'duże') {
+  if (sanitizedData.srodowisko === 'duże') {
     applyMultiplier('env_large', 'Ekspozycja środowiskowa: duża', 1.5, true);
   }
 
-  if (formData.podwykonawcy === 'tak') {
+  if (sanitizedData.podwykonawcy === 'tak') {
     applyMultiplier('subcontractors', 'Podwykonawcy', 1.15);
   }
 
-  if (formData.prace_na_wysokosci === 'tak') {
+  if (sanitizedData.prace_na_wysokosci === 'tak') {
     applyMultiplier('height_work', 'Prace na wysokości', 1.15);
   }
 
-  if (formData.roboty_ziemne === 'tak') {
+  if (sanitizedData.roboty_ziemne === 'tak') {
     applyMultiplier('excavation', 'Roboty ziemne / wykopy', 1.1);
   }
 
-  if (toNumber(formData.szkody_historyczne) > 2) {
+  if (toNumber(sanitizedData.szkody_historyczne) > 2) {
     applyMultiplier('multiple_or_large_claims', 'Szkodowość: multiple/large claims', 1.5, true);
   }
 
