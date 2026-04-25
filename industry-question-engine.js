@@ -37,6 +37,12 @@ const QUESTION_ENGINE = {
         type: 'number',
         helperText: 'Podaj przybliżoną średnią miesięczną.',
         required: true
+      },
+      {
+        key: 'ekspozycja_eventowa',
+        label: 'czy działalność obejmuje organizację eventów / imprez?',
+        type: 'yesno',
+        required: true
       }
     ],
     environmental: [
@@ -198,7 +204,8 @@ function evaluateCase(formData) {
     selected_model,
     risk_flags,
     coverages,
-    refer_to_underwriter
+    refer_to_underwriter,
+    form_data: { ...formData }
   };
 }
 

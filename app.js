@@ -15,7 +15,34 @@ function addPlaceholderOption(select, text) {
   select.appendChild(option);
 }
 
-function renderField(question) {
+function setFieldValue(input, question, formData) {
+  const existingValue = formData?.[question.key];
+  if (existingValue === undefined || existingValue === null) {
+    return;
+  }
+
+  if (input.multiple) {
+    const selectedValues = Array.isArray(existingValue) ? existingValue : [existingValue];
+    Array.from(input.options).forEach((option) => {
+      option.selected = selectedValues.includes(option.value);
+    });
+    return;
+  }
+
+  if (input.tagName === 'TEXTAREA') {
+    input.value = String(existingValue);
+    return;
+  }
+
+  if (input.type === 'checkbox') {
+    input.checked = Boolean(existingValue);
+    return;
+  }
+
+  input.value = String(existingValue);
+}
+
+function renderField(question, formData = {}) {
   const wrapper = document.createElement('div');
   wrapper.className = 'field';
 
@@ -74,6 +101,9 @@ function renderField(question) {
     });
   } else if (question.type === 'text') {
     input = document.createElement('textarea');
+  } else if (question.type === 'checkbox') {
+    input = document.createElement('input');
+    input.type = 'checkbox';
   } else {
     input = document.createElement('input');
     input.type = 'number';
@@ -82,6 +112,7 @@ function renderField(question) {
 
   input.id = question.key;
   input.name = question.key;
+  setFieldValue(input, question, formData);
 
   wrapper.appendChild(label);
 
@@ -106,8 +137,9 @@ function renderField(question) {
 
 function renderBaseQuestions() {
   baseContainer.innerHTML = '<h2>Pytania podstawowe</h2>';
+  const formData = getFormData();
   window.QUESTION_ENGINE.baseQuestions.forEach((question) => {
-    baseContainer.appendChild(renderField(question));
+    baseContainer.appendChild(renderField(question, formData));
   });
 }
 
@@ -129,16 +161,57 @@ function renderBranchQuestions(formData) {
       if (typeof question.showIf === 'function' && !question.showIf(formData)) {
         return;
       }
-      branchContainer.appendChild(renderField(question));
+      branchContainer.appendChild(renderField(question, formData));
     });
   });
 }
 
 function getFieldValue(field) {
+  if (field.type === 'checkbox') {
+    return field.checked;
+  }
   if (field.multiple) {
     return Array.from(field.selectedOptions).map((opt) => opt.value);
   }
   return field.value;
+}
+
+function formatAnswerValue(value) {
+  if (Array.isArray(value)) {
+    return value.length ? value.join(', ') : '—';
+  }
+  if (typeof value === 'boolean') {
+    return value ? 'tak' : 'nie';
+  }
+  if (value === undefined || value === null || String(value).trim() === '') {
+    return '—';
+  }
+  return String(value);
+}
+
+function renderBranchAnswers(formData) {
+  const visibleQuestions = window.getVisibleQuestions(formData);
+  const branchQuestionKeys = new Set(
+    Object.values(window.QUESTION_ENGINE.branchQuestions)
+      .flat()
+      .map((question) => question.key)
+  );
+
+  const visibleBranchQuestions = visibleQuestions.filter((question) => branchQuestionKeys.has(question.key));
+  const target = document.getElementById('out-branch-answers');
+
+  if (!target) {
+    return;
+  }
+
+  if (visibleBranchQuestions.length === 0) {
+    target.textContent = 'Brak';
+    return;
+  }
+
+  target.textContent = visibleBranchQuestions
+    .map((question) => `${question.label}: ${formatAnswerValue(formData[question.key])}`)
+    .join(' | ');
 }
 
 function getFormData() {
@@ -220,6 +293,7 @@ function showResult(result, pricingResult) {
 
   document.getElementById('out-minimum-premium').textContent = formatCurrencyPln(pricingResult.minimum_premium);
   document.getElementById('out-pricing-note').textContent = pricingResult.note;
+  renderBranchAnswers(result.form_data || {});
 }
 
 form.addEventListener('change', () => {
