@@ -1,0 +1,16 @@
+{
+  "source": "data/extracted/all_tariff_text.txt",
+  "language": "de",
+  "extraction_status": "raw_unverified",
+  "tariff_sections": [],
+  "global_questions": [],
+  "global_rules": [],
+  "uncertain_items": [
+    {
+      "item_type": "source_file_missing",
+      "source_reference": "data/extracted/all_tariff_text.txt",
+      "explanation": "Die angegebene Quelldatei wurde im Repository nicht gefunden, daher konnte keine strukturierte Extraktion aus dem deutschen Tariftest durchgeführt werden.",
+      "recommended_action": "Quelldatei unter data/extracted/all_tariff_text.txt bereitstellen; danach vollständige Extraktion der Tarifabschnitte, Branchen, Faktoren, Limite, Selbstbehalte, Ausschlüsse und UW-Regeln durchführen."
+    }
+  ]
+}
