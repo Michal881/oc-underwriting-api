@@ -7,18 +7,7 @@
 */
 
 const QUESTION_ENGINE = {
-  industries: [
-    { value: 'produkcja', label: 'Produkcja' },
-    { value: 'handel', label: 'Handel' },
-    { value: 'uslugi', label: 'Usługi' },
-    { value: 'budownictwo', label: 'Budownictwo' },
-    { value: 'gastronomia_hotelarstwo', label: 'Gastronomia / Hotelarstwo' },
-    { value: 'transport', label: 'Transport' },
-    // Wyłączone przez zakres zadania:
-    { value: 'rolnictwo', label: 'Rolnictwo (poza zakresem)', excluded: true },
-    { value: 'oc_zawodowe', label: 'OC zawodowe (poza zakresem)', excluded: true },
-    { value: 'zawody_techniczne', label: 'Zawody techniczne (poza zakresem)', excluded: true }
-  ],
+  industries: window.REFERENCE_DATA.industryGroups,
 
   baseQuestions: [
     { key: 'dzialalnosc', label: 'działalność', type: 'select', required: true },
@@ -35,7 +24,7 @@ const QUESTION_ENGINE = {
 
   branchQuestions: {
     construction: [
-      { key: 'typ_prac', label: 'typ prac', type: 'text', required: true },
+      { key: 'typ_prac', label: 'typ prac', type: 'text', options: window.REFERENCE_DATA.constructionWorkTypes, required: true },
       { key: 'podwykonawcy', label: 'podwykonawcy', type: 'yesno', required: true },
       { key: 'wartosc_projektow', label: 'wartość projektów', type: 'number', required: true },
       { key: 'roboty_ziemne', label: 'czy prace obejmują roboty ziemne / wykopy?', type: 'yesno', required: true },
@@ -55,17 +44,7 @@ const QUESTION_ENGINE = {
         key: 'substancje',
         label: 'substancje',
         type: 'multiselect',
-        options: [
-          'brak',
-          'paliwa / oleje',
-          'chemikalia',
-          'farby / lakiery / rozpuszczalniki',
-          'odpady',
-          'ścieki technologiczne',
-          'gazy techniczne',
-          'pyły / emisje',
-          'inne'
-        ],
+        options: window.REFERENCE_DATA.environmentalSubstances,
         required: true
       },
       {
@@ -144,30 +123,32 @@ function getVisibleQuestions(formData) {
 function evaluateCase(formData) {
   const industry_group = classifyIndustry(formData);
   const risk_flags = [];
-  const coverages = ['OC działalności'];
-  let selected_model = 'M1';
+  const coverages = [window.REFERENCE_DATA.coverageLabels.businessLiability];
+  let selected_model = window.REFERENCE_DATA.pricingModelLabels.M1;
 
   // OC produktu + rozszerzenia
   if (formData.produkt === 'tak') {
-    coverages.push('OC produktu');
-    selected_model = 'M2';
+    coverages.push(window.REFERENCE_DATA.coverageLabels.productLiability);
+    selected_model = window.REFERENCE_DATA.pricingModelLabels.M2;
 
     if (formData.usa_kanada === 'tak') {
-      coverages.push('rozszerzone OC produktu');
-      selected_model = 'M3';
+      coverages.push(window.REFERENCE_DATA.coverageLabels.extendedProductLiability);
+      selected_model = window.REFERENCE_DATA.pricingModelLabels.M3;
       risk_flags.push('Ekspozycja USA/Kanada');
     }
   }
 
   // Ekspozycja środowiskowa
   if (formData.srodowisko !== 'brak') {
-    coverages.push('OC środowiskowe (cywilne)');
-    selected_model = selected_model === 'M3' ? 'M5' : 'M4';
+    coverages.push(window.REFERENCE_DATA.coverageLabels.environmentalCivilLiability);
+    selected_model = selected_model === window.REFERENCE_DATA.pricingModelLabels.M3
+      ? window.REFERENCE_DATA.pricingModelLabels.M5
+      : window.REFERENCE_DATA.pricingModelLabels.M4;
 
     if (formData.srodowisko === 'duże') {
-      coverages.push('szkody ekologiczne (public law)');
+      coverages.push(window.REFERENCE_DATA.coverageLabels.environmentalPublicLaw);
       risk_flags.push('Duża ekspozycja środowiskowa');
-      selected_model = 'M6';
+      selected_model = window.REFERENCE_DATA.pricingModelLabels.M6;
     }
   }
 
