@@ -81,3 +81,25 @@ button:hover {
 .result-row {
   margin-bottom: 8px;
 }
+
+.field-helper,
+.field-unit {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #475569;
+}
+
+.field-unit {
+  margin-bottom: 6px;
+}
+
+.required-mark {
+  color: #b91c1c;
+}
+
+.validation-errors {
+  border-color: #fecaca;
+  background: #fff1f2;
+  color: #9f1239;
+  font-weight: 600;
+}
