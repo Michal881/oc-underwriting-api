@@ -188,7 +188,19 @@ function showValidationErrors(missingLabels) {
   validationContainer.textContent = `Uzupełnij wymagane pola: ${missingLabels.join(', ')}.`;
 }
 
-function showResult(result) {
+function formatCurrencyPln(value) {
+  return new Intl.NumberFormat('pl-PL', {
+    style: 'currency',
+    currency: 'PLN',
+    maximumFractionDigits: 0
+  }).format(Math.round(value));
+}
+
+function formatPercent(value) {
+  return `${(value * 100).toFixed(2)}%`;
+}
+
+function showResult(result, pricingResult) {
   document.getElementById('result').hidden = false;
   document.getElementById('out-industry').textContent = result.industry_group;
   document.getElementById('out-model').textContent = result.selected_model;
@@ -196,7 +208,18 @@ function showResult(result) {
     ? result.risk_flags.join(', ')
     : 'Brak';
   document.getElementById('out-coverages').textContent = result.coverages.join(', ');
-  document.getElementById('out-referral').textContent = result.refer_to_underwriter ? 'TAK' : 'NIE';
+  document.getElementById('out-referral').textContent = pricingResult.refer_to_underwriter ? 'TAK' : 'NIE';
+
+  document.getElementById('out-estimated-premium').textContent = formatCurrencyPln(pricingResult.estimated_premium);
+  document.getElementById('out-base-exposure').textContent = formatCurrencyPln(pricingResult.base_exposure);
+  document.getElementById('out-base-rate').textContent = formatPercent(pricingResult.base_rate);
+
+  document.getElementById('out-applied-multipliers').textContent = pricingResult.applied_multipliers.length
+    ? pricingResult.applied_multipliers.map((item) => `${item.label} (+${Math.round((item.factor - 1) * 100)}%)`).join(', ')
+    : 'Brak';
+
+  document.getElementById('out-minimum-premium').textContent = formatCurrencyPln(pricingResult.minimum_premium);
+  document.getElementById('out-pricing-note').textContent = pricingResult.note;
 }
 
 form.addEventListener('change', () => {
@@ -217,7 +240,8 @@ form.addEventListener('submit', (event) => {
 
   showValidationErrors([]);
   const result = window.evaluateCase(data);
-  showResult(result);
+  const pricingResult = window.PRICING_ENGINE.calculateIndicativePremium(data, result);
+  showResult(result, pricingResult);
 });
 
 renderBaseQuestions();
