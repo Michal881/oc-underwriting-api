@@ -9,7 +9,7 @@
 <body>
   <main class="container">
     <h1>OC Underwriting Engine (MVP)</h1>
-    <p class="muted">Prosty formularz do oceny ryzyka OC bez kalkulacji ceny.</p>
+    <p class="muted">Prosty formularz do oceny ryzyka OC z orientacyjną kalkulacją składki MVP.</p>
 
     <form id="underwriting-form">
       <section class="card" id="base-questions"></section>
@@ -28,11 +28,18 @@
       <div class="result-row"><strong>Ryzyka:</strong> <span id="out-risks"></span></div>
       <div class="result-row"><strong>Zakres:</strong> <span id="out-coverages"></span></div>
       <div class="result-row"><strong>Czy referral:</strong> <span id="out-referral"></span></div>
+      <div class="result-row"><strong>Szacowana składka:</strong> <span id="out-estimated-premium"></span></div>
+      <div class="result-row"><strong>Baza ekspozycji:</strong> <span id="out-base-exposure"></span></div>
+      <div class="result-row"><strong>Stawka bazowa:</strong> <span id="out-base-rate"></span></div>
+      <div class="result-row"><strong>Zastosowane mnożniki:</strong> <span id="out-applied-multipliers"></span></div>
+      <div class="result-row"><strong>Składka minimalna:</strong> <span id="out-minimum-premium"></span></div>
+      <p class="muted" id="out-pricing-note"></p>
     </section>
   </main>
 
   <script src="reference-data.js"></script>
   <script src="industry-question-engine.js"></script>
+  <script src="pricing-engine.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
