@@ -102,11 +102,37 @@ function getActiveBranches(formData) {
     branches.push('hospitality');
   }
 
-  if (formData.srodowisko !== 'brak' && formData.srodowisko !== '') {
+  if (formData.srodowisko === 'średnie' || formData.srodowisko === 'duże') {
     branches.push('environmental');
   }
 
   return branches;
+}
+
+function sanitizeFormData(formData) {
+  const safeData = {};
+
+  QUESTION_ENGINE.baseQuestions.forEach((question) => {
+    if (Object.prototype.hasOwnProperty.call(formData, question.key)) {
+      safeData[question.key] = formData[question.key];
+    }
+  });
+
+  const activeBranches = getActiveBranches(safeData);
+  activeBranches.forEach((branch) => {
+    const questions = QUESTION_ENGINE.branchQuestions[branch] || [];
+    questions.forEach((question) => {
+      if (typeof question.showIf === 'function' && !question.showIf(safeData)) {
+        return;
+      }
+
+      if (Object.prototype.hasOwnProperty.call(formData, question.key)) {
+        safeData[question.key] = formData[question.key];
+      }
+    });
+  });
+
+  return safeData;
 }
 
 function getVisibleQuestions(formData) {
@@ -127,17 +153,18 @@ function getVisibleQuestions(formData) {
 }
 
 function evaluateCase(formData) {
-  const industry_group = classifyIndustry(formData);
+  const sanitizedData = sanitizeFormData(formData);
+  const industry_group = classifyIndustry(sanitizedData);
   const risk_flags = [];
   const coverages = [window.REFERENCE_DATA.coverageLabels.businessLiability];
   let selected_model = window.REFERENCE_DATA.pricingModelLabels.M1;
 
   // OC produktu + rozszerzenia
-  if (formData.produkt === 'tak') {
+  if (sanitizedData.produkt === 'tak') {
     coverages.push(window.REFERENCE_DATA.coverageLabels.productLiability);
     selected_model = window.REFERENCE_DATA.pricingModelLabels.M2;
 
-    if (formData.usa_kanada === 'tak') {
+    if (sanitizedData.usa_kanada === 'tak') {
       coverages.push(window.REFERENCE_DATA.coverageLabels.extendedProductLiability);
       selected_model = window.REFERENCE_DATA.pricingModelLabels.M3;
       risk_flags.push(window.REFERENCE_DATA.riskFlagLabels.usaCanadaExposure);
@@ -145,13 +172,13 @@ function evaluateCase(formData) {
   }
 
   // Ekspozycja środowiskowa
-  if (formData.srodowisko !== 'brak') {
+  if (sanitizedData.srodowisko !== 'brak') {
     coverages.push(window.REFERENCE_DATA.coverageLabels.environmentalCivilLiability);
     selected_model = selected_model === window.REFERENCE_DATA.pricingModelLabels.M3
       ? window.REFERENCE_DATA.pricingModelLabels.M5
       : window.REFERENCE_DATA.pricingModelLabels.M4;
 
-    if (formData.srodowisko === 'duże') {
+    if (sanitizedData.srodowisko === 'duże') {
       coverages.push(window.REFERENCE_DATA.coverageLabels.environmentalPublicLaw);
       risk_flags.push(window.REFERENCE_DATA.riskFlagLabels.highEnvironmentalExposure);
       selected_model = window.REFERENCE_DATA.pricingModelLabels.M6;
@@ -159,45 +186,45 @@ function evaluateCase(formData) {
   }
 
   // Flagi ryzyka z pytań ogólnych
-  if (Number(formData.szkody_historyczne || 0) > 2) {
+  if (Number(sanitizedData.szkody_historyczne || 0) > 2) {
     risk_flags.push(window.REFERENCE_DATA.riskFlagLabels.elevatedClaimsHistory);
   }
 
-  if (formData.praca_u_klienta === 'tak') {
+  if (sanitizedData.praca_u_klienta === 'tak') {
     risk_flags.push(window.REFERENCE_DATA.riskFlagLabels.workAtClientSite);
   }
 
-  if (formData.mienie_klienta === 'tak') {
+  if (sanitizedData.mienie_klienta === 'tak') {
     risk_flags.push(window.REFERENCE_DATA.riskFlagLabels.customerPropertyInCare);
   }
 
   // Branch logic
-  if (formData.dzialalnosc === 'budownictwo') {
+  if (sanitizedData.dzialalnosc === 'budownictwo') {
     risk_flags.push(window.REFERENCE_DATA.riskFlagLabels.constructionRisk);
-    if (formData.podwykonawcy === 'tak') {
+    if (sanitizedData.podwykonawcy === 'tak') {
       risk_flags.push(window.REFERENCE_DATA.riskFlagLabels.subcontractorInvolvement);
     }
-    if (formData.roboty_ziemne === 'tak') {
+    if (sanitizedData.roboty_ziemne === 'tak') {
       risk_flags.push(window.REFERENCE_DATA.riskFlagLabels.earthworks);
     }
-    if (formData.prace_na_wysokosci === 'tak') {
+    if (sanitizedData.prace_na_wysokosci === 'tak') {
       risk_flags.push(window.REFERENCE_DATA.riskFlagLabels.workingAtHeight);
     }
   }
 
-  if (formData.dzialalnosc === 'gastronomia_hotelarstwo' && Number(formData.liczba_klientow || 0) > 5000) {
+  if (sanitizedData.dzialalnosc === 'gastronomia_hotelarstwo' && Number(sanitizedData.liczba_klientow || 0) > 5000) {
     risk_flags.push(window.REFERENCE_DATA.riskFlagLabels.highPublicExposure);
   }
 
-  const selectedSubstances = Array.isArray(formData.substancje) ? formData.substancje : [];
+  const selectedSubstances = Array.isArray(sanitizedData.substancje) ? sanitizedData.substancje : [];
   if (selectedSubstances.length > 0 && !selectedSubstances.includes('brak')) {
     risk_flags.push(window.REFERENCE_DATA.riskFlagLabels.harmfulSubstancesPresent);
   }
 
   const refer_to_underwriter =
     risk_flags.length >= 3 ||
-    formData.usa_kanada === 'tak' ||
-    formData.srodowisko === 'duże';
+    sanitizedData.usa_kanada === 'tak' ||
+    sanitizedData.srodowisko === 'duże';
 
   return {
     industry_group,
@@ -205,7 +232,7 @@ function evaluateCase(formData) {
     risk_flags,
     coverages,
     refer_to_underwriter,
-    form_data: { ...formData }
+    form_data: { ...sanitizedData }
   };
 }
 
@@ -213,4 +240,5 @@ function evaluateCase(formData) {
 window.QUESTION_ENGINE = QUESTION_ENGINE;
 window.getActiveBranches = getActiveBranches;
 window.getVisibleQuestions = getVisibleQuestions;
+window.sanitizeFormData = sanitizeFormData;
 window.evaluateCase = evaluateCase;

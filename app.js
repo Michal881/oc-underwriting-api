@@ -137,7 +137,7 @@ function renderField(question, formData = {}) {
 
 function renderBaseQuestions() {
   baseContainer.innerHTML = '<h2>Pytania podstawowe</h2>';
-  const formData = getFormData();
+  const formData = window.sanitizeFormData(getFormData());
   window.QUESTION_ENGINE.baseQuestions.forEach((question) => {
     baseContainer.appendChild(renderField(question, formData));
   });
@@ -297,14 +297,14 @@ function showResult(result, pricingResult) {
 }
 
 form.addEventListener('change', () => {
-  const formData = getFormData();
+  const formData = window.sanitizeFormData(getFormData());
   renderBranchQuestions(formData);
   showValidationErrors([]);
 });
 
 form.addEventListener('submit', (event) => {
   event.preventDefault();
-  const data = getFormData();
+  const data = window.sanitizeFormData(getFormData());
   const missingLabels = validateForm(data);
 
   if (missingLabels.length > 0) {
@@ -314,9 +314,9 @@ form.addEventListener('submit', (event) => {
 
   showValidationErrors([]);
   const result = window.evaluateCase(data);
-  const pricingResult = window.PRICING_ENGINE.calculateIndicativePremium(data, result);
+  const pricingResult = window.PRICING_ENGINE.calculateIndicativePremium(result.form_data || data, result);
   showResult(result, pricingResult);
 });
 
 renderBaseQuestions();
-renderBranchQuestions(getFormData());
+renderBranchQuestions(window.sanitizeFormData(getFormData()));
