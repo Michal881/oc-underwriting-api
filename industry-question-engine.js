@@ -21,30 +21,71 @@ const QUESTION_ENGINE = {
   ],
 
   baseQuestions: [
-    { key: 'dzialalnosc', label: 'działalność', type: 'select' },
-    { key: 'opis_dzialalnosci', label: 'opis działalności', type: 'text' },
-    { key: 'obrot', label: 'obrót', type: 'number' },
-    { key: 'liczba_pracownikow', label: 'liczba pracowników', type: 'number' },
-    { key: 'produkt', label: 'produkt (tak/nie)', type: 'yesno' },
-    { key: 'praca_u_klienta', label: 'praca u klienta', type: 'yesno' },
-    { key: 'mienie_klienta', label: 'mienie klienta (CCC)', type: 'yesno' },
-    { key: 'srodowisko', label: 'środowisko', type: 'select', options: ['brak', 'małe', 'średnie', 'duże'] },
-    { key: 'usa_kanada', label: 'USA/Kanada', type: 'yesno' },
-    { key: 'szkody_historyczne', label: 'szkody historyczne', type: 'number' }
+    { key: 'dzialalnosc', label: 'działalność', type: 'select', required: true },
+    { key: 'opis_dzialalnosci', label: 'opis działalności', type: 'text', required: true },
+    { key: 'obrot', label: 'obrót', type: 'number', required: true },
+    { key: 'liczba_pracownikow', label: 'liczba pracowników', type: 'number', required: true },
+    { key: 'produkt', label: 'produkt (tak/nie)', type: 'yesno', required: true },
+    { key: 'praca_u_klienta', label: 'praca u klienta', type: 'yesno', required: true },
+    { key: 'mienie_klienta', label: 'mienie klienta (CCC)', type: 'yesno', required: true },
+    { key: 'srodowisko', label: 'środowisko', type: 'select', options: ['brak', 'małe', 'średnie', 'duże'], required: true },
+    { key: 'usa_kanada', label: 'USA/Kanada', type: 'yesno', required: true },
+    { key: 'szkody_historyczne', label: 'szkody historyczne', type: 'number', required: true }
   ],
 
   branchQuestions: {
     construction: [
-      { key: 'typ_prac', label: 'typ prac', type: 'text' },
-      { key: 'podwykonawcy', label: 'podwykonawcy', type: 'yesno' },
-      { key: 'wartosc_projektow', label: 'wartość projektów', type: 'number' }
+      { key: 'typ_prac', label: 'typ prac', type: 'text', required: true },
+      { key: 'podwykonawcy', label: 'podwykonawcy', type: 'yesno', required: true },
+      { key: 'wartosc_projektow', label: 'wartość projektów', type: 'number', required: true },
+      { key: 'roboty_ziemne', label: 'czy prace obejmują roboty ziemne / wykopy?', type: 'yesno', required: true },
+      { key: 'prace_na_wysokosci', label: 'czy prace obejmują prace na wysokości?', type: 'yesno', required: true }
     ],
     hospitality: [
-      { key: 'liczba_klientow', label: 'liczba klientów', type: 'number' }
+      {
+        key: 'liczba_klientow',
+        label: 'liczba klientów / gości / uczestników miesięcznie',
+        type: 'number',
+        helperText: 'Podaj przybliżoną średnią miesięczną.',
+        required: true
+      }
     ],
     environmental: [
-      { key: 'substancje', label: 'substancje', type: 'text' },
-      { key: 'pojemnosc', label: 'pojemność', type: 'number' }
+      {
+        key: 'substancje',
+        label: 'substancje',
+        type: 'multiselect',
+        options: [
+          'brak',
+          'paliwa / oleje',
+          'chemikalia',
+          'farby / lakiery / rozpuszczalniki',
+          'odpady',
+          'ścieki technologiczne',
+          'gazy techniczne',
+          'pyły / emisje',
+          'inne'
+        ],
+        required: true
+      },
+      {
+        key: 'substancje_inne_opis',
+        label: 'opisz substancję / instalację',
+        type: 'text',
+        required: true,
+        showIf: (formData) => {
+          const selected = Array.isArray(formData.substancje) ? formData.substancje : [];
+          return selected.includes('inne');
+        }
+      },
+      {
+        key: 'pojemnosc',
+        label: 'łączna pojemność / ilość magazynowanych substancji',
+        type: 'number',
+        helperText: 'Dla MVP wystarczy wartość przybliżona.',
+        unitHint: 'litry lub kg',
+        required: true
+      }
     ]
   }
 };
@@ -76,11 +117,28 @@ function getActiveBranches(formData) {
     branches.push('hospitality');
   }
 
-  if (formData.srodowisko !== 'brak') {
+  if (formData.srodowisko !== 'brak' && formData.srodowisko !== '') {
     branches.push('environmental');
   }
 
   return branches;
+}
+
+function getVisibleQuestions(formData) {
+  const visible = [...QUESTION_ENGINE.baseQuestions];
+  const branches = getActiveBranches(formData);
+
+  branches.forEach((branch) => {
+    const questions = QUESTION_ENGINE.branchQuestions[branch] || [];
+    questions.forEach((question) => {
+      if (typeof question.showIf === 'function' && !question.showIf(formData)) {
+        return;
+      }
+      visible.push(question);
+    });
+  });
+
+  return visible;
 }
 
 function evaluateCase(formData) {
@@ -132,13 +190,20 @@ function evaluateCase(formData) {
     if (formData.podwykonawcy === 'tak') {
       risk_flags.push('Udział podwykonawców');
     }
+    if (formData.roboty_ziemne === 'tak') {
+      risk_flags.push('Roboty ziemne / wykopy');
+    }
+    if (formData.prace_na_wysokosci === 'tak') {
+      risk_flags.push('Prace na wysokości');
+    }
   }
 
   if (formData.dzialalnosc === 'gastronomia_hotelarstwo' && Number(formData.liczba_klientow || 0) > 5000) {
     risk_flags.push('Wysoka ekspozycja publiczna');
   }
 
-  if (formData.substancje && formData.substancje.trim().length > 0) {
+  const selectedSubstances = Array.isArray(formData.substancje) ? formData.substancje : [];
+  if (selectedSubstances.length > 0 && !selectedSubstances.includes('brak')) {
     risk_flags.push('Obecność substancji potencjalnie szkodliwych');
   }
 
@@ -159,4 +224,5 @@ function evaluateCase(formData) {
 // Udostępnienie engine globalnie dla app.js
 window.QUESTION_ENGINE = QUESTION_ENGINE;
 window.getActiveBranches = getActiveBranches;
+window.getVisibleQuestions = getVisibleQuestions;
 window.evaluateCase = evaluateCase;

@@ -6,6 +6,14 @@
 const form = document.getElementById('underwriting-form');
 const baseContainer = document.getElementById('base-questions');
 const branchContainer = document.getElementById('branch-questions');
+const validationContainer = document.getElementById('validation-errors');
+
+function addPlaceholderOption(select, text) {
+  const option = document.createElement('option');
+  option.value = '';
+  option.textContent = text;
+  select.appendChild(option);
+}
 
 function renderField(question) {
   const wrapper = document.createElement('div');
@@ -15,16 +23,20 @@ function renderField(question) {
   label.setAttribute('for', question.key);
   label.textContent = question.label;
 
+  if (question.required) {
+    const reqMark = document.createElement('span');
+    reqMark.className = 'required-mark';
+    reqMark.textContent = ' *';
+    label.appendChild(reqMark);
+  }
+
   let input;
 
   if (question.type === 'select') {
     input = document.createElement('select');
-    if (question.key === 'dzialalnosc') {
-      const empty = document.createElement('option');
-      empty.value = '';
-      empty.textContent = 'Wybierz';
-      input.appendChild(empty);
+    addPlaceholderOption(input, 'Wybierz');
 
+    if (question.key === 'dzialalnosc') {
       window.QUESTION_ENGINE.industries.forEach((industry) => {
         const option = document.createElement('option');
         option.value = industry.value;
@@ -40,8 +52,20 @@ function renderField(question) {
         input.appendChild(option);
       });
     }
+  } else if (question.type === 'multiselect') {
+    input = document.createElement('select');
+    input.multiple = true;
+    input.size = Math.min(question.options.length, 8);
+
+    question.options.forEach((opt) => {
+      const option = document.createElement('option');
+      option.value = opt;
+      option.textContent = opt;
+      input.appendChild(option);
+    });
   } else if (question.type === 'yesno') {
     input = document.createElement('select');
+    addPlaceholderOption(input, 'Wybierz');
     ['nie', 'tak'].forEach((v) => {
       const option = document.createElement('option');
       option.value = v;
@@ -60,7 +84,23 @@ function renderField(question) {
   input.name = question.key;
 
   wrapper.appendChild(label);
+
+  if (question.unitHint) {
+    const unit = document.createElement('div');
+    unit.className = 'field-unit';
+    unit.textContent = `Jednostka: ${question.unitHint}`;
+    wrapper.appendChild(unit);
+  }
+
   wrapper.appendChild(input);
+
+  if (question.helperText) {
+    const helper = document.createElement('div');
+    helper.className = 'field-helper';
+    helper.textContent = question.helperText;
+    wrapper.appendChild(helper);
+  }
+
   return wrapper;
 }
 
@@ -86,9 +126,19 @@ function renderBranchQuestions(formData) {
   activeBranches.forEach((branch) => {
     const questions = window.QUESTION_ENGINE.branchQuestions[branch] || [];
     questions.forEach((question) => {
+      if (typeof question.showIf === 'function' && !question.showIf(formData)) {
+        return;
+      }
       branchContainer.appendChild(renderField(question));
     });
   });
+}
+
+function getFieldValue(field) {
+  if (field.multiple) {
+    return Array.from(field.selectedOptions).map((opt) => opt.value);
+  }
+  return field.value;
 }
 
 function getFormData() {
@@ -96,10 +146,46 @@ function getFormData() {
   const fields = form.querySelectorAll('input, select, textarea');
 
   fields.forEach((field) => {
-    data[field.name] = field.value;
+    data[field.name] = getFieldValue(field);
   });
 
   return data;
+}
+
+function validateForm(formData) {
+  const visibleQuestions = window.getVisibleQuestions(formData);
+  const missingLabels = [];
+
+  visibleQuestions.forEach((question) => {
+    if (!question.required) {
+      return;
+    }
+
+    const value = formData[question.key];
+    if (Array.isArray(value)) {
+      if (value.length === 0) {
+        missingLabels.push(question.label);
+      }
+      return;
+    }
+
+    if (value === undefined || value === null || String(value).trim() === '') {
+      missingLabels.push(question.label);
+    }
+  });
+
+  return missingLabels;
+}
+
+function showValidationErrors(missingLabels) {
+  if (missingLabels.length === 0) {
+    validationContainer.hidden = true;
+    validationContainer.textContent = '';
+    return;
+  }
+
+  validationContainer.hidden = false;
+  validationContainer.textContent = `Uzupełnij wymagane pola: ${missingLabels.join(', ')}.`;
 }
 
 function showResult(result) {
@@ -114,12 +200,22 @@ function showResult(result) {
 }
 
 form.addEventListener('change', () => {
-  renderBranchQuestions(getFormData());
+  const formData = getFormData();
+  renderBranchQuestions(formData);
+  showValidationErrors([]);
 });
 
 form.addEventListener('submit', (event) => {
   event.preventDefault();
   const data = getFormData();
+  const missingLabels = validateForm(data);
+
+  if (missingLabels.length > 0) {
+    showValidationErrors(missingLabels);
+    return;
+  }
+
+  showValidationErrors([]);
   const result = window.evaluateCase(data);
   showResult(result);
 });
