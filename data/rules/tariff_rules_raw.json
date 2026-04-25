@@ -1,7 +1,7 @@
 {
   "source": "data/extracted/all_tariff_text.txt",
   "language": "de",
-  "extraction_status": "raw_unverified",
+  "extraction_status": "blocked_missing_source",
   "tariff_sections": [],
   "global_questions": [],
   "global_rules": [],
@@ -9,8 +9,12 @@
     {
       "item_type": "source_file_missing",
       "source_reference": "data/extracted/all_tariff_text.txt",
-      "explanation": "Die angegebene Quelldatei wurde im Repository nicht gefunden, daher konnte keine strukturierte Extraktion aus dem deutschen Tariftest durchgeführt werden.",
-      "recommended_action": "Quelldatei unter data/extracted/all_tariff_text.txt bereitstellen; danach vollständige Extraktion der Tarifabschnitte, Branchen, Faktoren, Limite, Selbstbehalte, Ausschlüsse und UW-Regeln durchführen."
+      "explanation": "Die angegebene Quelldatei konnte im Repository nicht gefunden werden, daher war keine inhaltliche Extraktion von Tarifdaten möglich.",
+      "attempted_paths": [
+        "data/extracted/all_tariff_text.txt",
+        "/workspace/oc-underwriting-api/data/extracted/all_tariff_text.txt"
+      ],
+      "recommended_action": "Quelldatei unter data/extracted/all_tariff_text.txt bereitstellen; danach die strukturierte Extraktion (Tarifabschnitte, Fragen, Regeln) erneut ausführen."
     }
   ]
 }
