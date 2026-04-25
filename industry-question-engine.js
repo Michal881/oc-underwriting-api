@@ -17,14 +17,14 @@ const QUESTION_ENGINE = {
     { key: 'produkt', label: 'produkt (tak/nie)', type: 'yesno', required: true },
     { key: 'praca_u_klienta', label: 'praca u klienta', type: 'yesno', required: true },
     { key: 'mienie_klienta', label: 'mienie klienta (CCC)', type: 'yesno', required: true },
-    { key: 'srodowisko', label: 'środowisko', type: 'select', options: ['brak', 'małe', 'średnie', 'duże'], required: true },
+    { key: 'srodowisko', label: 'środowisko', type: 'select', options: window.REFERENCE_DATA.environmentalExposureLevels, required: true },
     { key: 'usa_kanada', label: 'USA/Kanada', type: 'yesno', required: true },
     { key: 'szkody_historyczne', label: 'szkody historyczne', type: 'number', required: true }
   ],
 
   branchQuestions: {
     construction: [
-      { key: 'typ_prac', label: 'typ prac', type: 'text', options: window.REFERENCE_DATA.constructionWorkTypes, required: true },
+      { key: 'typ_prac', label: 'typ prac', type: 'select', options: window.REFERENCE_DATA.constructionWorkTypes, required: true },
       { key: 'podwykonawcy', label: 'podwykonawcy', type: 'yesno', required: true },
       { key: 'wartosc_projektow', label: 'wartość projektów', type: 'number', required: true },
       { key: 'roboty_ziemne', label: 'czy prace obejmują roboty ziemne / wykopy?', type: 'yesno', required: true },
@@ -134,7 +134,7 @@ function evaluateCase(formData) {
     if (formData.usa_kanada === 'tak') {
       coverages.push(window.REFERENCE_DATA.coverageLabels.extendedProductLiability);
       selected_model = window.REFERENCE_DATA.pricingModelLabels.M3;
-      risk_flags.push('Ekspozycja USA/Kanada');
+      risk_flags.push(window.REFERENCE_DATA.riskFlagLabels.usaCanadaExposure);
     }
   }
 
@@ -147,45 +147,45 @@ function evaluateCase(formData) {
 
     if (formData.srodowisko === 'duże') {
       coverages.push(window.REFERENCE_DATA.coverageLabels.environmentalPublicLaw);
-      risk_flags.push('Duża ekspozycja środowiskowa');
+      risk_flags.push(window.REFERENCE_DATA.riskFlagLabels.highEnvironmentalExposure);
       selected_model = window.REFERENCE_DATA.pricingModelLabels.M6;
     }
   }
 
   // Flagi ryzyka z pytań ogólnych
   if (Number(formData.szkody_historyczne || 0) > 2) {
-    risk_flags.push('Podwyższona szkodowość historyczna');
+    risk_flags.push(window.REFERENCE_DATA.riskFlagLabels.elevatedClaimsHistory);
   }
 
   if (formData.praca_u_klienta === 'tak') {
-    risk_flags.push('Prace wykonywane u klienta');
+    risk_flags.push(window.REFERENCE_DATA.riskFlagLabels.workAtClientSite);
   }
 
   if (formData.mienie_klienta === 'tak') {
-    risk_flags.push('Mienie klienta w pieczy (CCC)');
+    risk_flags.push(window.REFERENCE_DATA.riskFlagLabels.customerPropertyInCare);
   }
 
   // Branch logic
   if (formData.dzialalnosc === 'budownictwo') {
-    risk_flags.push('Ryzyko budowlane');
+    risk_flags.push(window.REFERENCE_DATA.riskFlagLabels.constructionRisk);
     if (formData.podwykonawcy === 'tak') {
-      risk_flags.push('Udział podwykonawców');
+      risk_flags.push(window.REFERENCE_DATA.riskFlagLabels.subcontractorInvolvement);
     }
     if (formData.roboty_ziemne === 'tak') {
-      risk_flags.push('Roboty ziemne / wykopy');
+      risk_flags.push(window.REFERENCE_DATA.riskFlagLabels.earthworks);
     }
     if (formData.prace_na_wysokosci === 'tak') {
-      risk_flags.push('Prace na wysokości');
+      risk_flags.push(window.REFERENCE_DATA.riskFlagLabels.workingAtHeight);
     }
   }
 
   if (formData.dzialalnosc === 'gastronomia_hotelarstwo' && Number(formData.liczba_klientow || 0) > 5000) {
-    risk_flags.push('Wysoka ekspozycja publiczna');
+    risk_flags.push(window.REFERENCE_DATA.riskFlagLabels.highPublicExposure);
   }
 
   const selectedSubstances = Array.isArray(formData.substancje) ? formData.substancje : [];
   if (selectedSubstances.length > 0 && !selectedSubstances.includes('brak')) {
-    risk_flags.push('Obecność substancji potencjalnie szkodliwych');
+    risk_flags.push(window.REFERENCE_DATA.riskFlagLabels.harmfulSubstancesPresent);
   }
 
   const refer_to_underwriter =

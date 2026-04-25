@@ -25,6 +25,8 @@ const REFERENCE_DATA = {
     'inne'
   ],
 
+  environmentalExposureLevels: ['brak', 'małe', 'średnie', 'duże'],
+
   environmentalSubstances: [
     'brak',
     'paliwa / oleje',
@@ -44,12 +46,7 @@ const REFERENCE_DATA = {
     'USA/Kanada'
   ],
 
-  claimsHistoryOptions: [
-    '0',
-    '1',
-    '2',
-    '3+'
-  ],
+  claimsHistoryOptions: ['0', '1', '2', '3+'],
 
   coverageLabels: {
     businessLiability: 'OC działalności',
@@ -66,6 +63,20 @@ const REFERENCE_DATA = {
     M4: 'M4',
     M5: 'M5',
     M6: 'M6'
+  },
+
+  riskFlagLabels: {
+    usaCanadaExposure: 'Ekspozycja USA/Kanada',
+    highEnvironmentalExposure: 'Duża ekspozycja środowiskowa',
+    elevatedClaimsHistory: 'Podwyższona szkodowość historyczna',
+    workAtClientSite: 'Prace wykonywane u klienta',
+    customerPropertyInCare: 'Mienie klienta w pieczy (CCC)',
+    constructionRisk: 'Ryzyko budowlane',
+    subcontractorInvolvement: 'Udział podwykonawców',
+    earthworks: 'Roboty ziemne / wykopy',
+    workingAtHeight: 'Prace na wysokości',
+    highPublicExposure: 'Wysoka ekspozycja publiczna',
+    harmfulSubstancesPresent: 'Obecność substancji potencjalnie szkodliwych'
   }
 };
 
